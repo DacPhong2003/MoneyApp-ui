@@ -90,6 +90,19 @@ function parseTxDate(iso) {
 function monthKeyFromDate(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 function isThu(t) { return t.chieu === 'thu'; }
 function isChi(t) { return !isThu(t); }
+function toDateInputValue(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function txInRange(t, startStr, endStr) {
+  const d = parseTxDate(t.thoi_gian_giao_dich);
+  if (isNaN(d.getTime())) return false;
+  if (startStr) { const start = new Date(startStr + 'T00:00:00'); if (d < start) return false; }
+  if (endStr) { const end = new Date(endStr + 'T23:59:59'); if (d > end) return false; }
+  return true;
+}
+function updateTxModeUI() {
+  const isCustom = STATE.txViewMode === 'custom';
+  $('#tx-month-nav').style.display = isCustom ? 'none' : 'flex';
+  $('#tx-date-range-bar').style.display = isCustom ? 'flex' : 'none';
+}
 function monthLabel(d) { return `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`; }
 function fmtTxTime(raw) {
   const d = parseTxDate(raw);
@@ -103,7 +116,7 @@ function fmtDateTime(iso) {
 
 let STATE = {
   transactions: [], categories: [], budgets: { overall_monthly: null, by_category: {} },
-  subscriptions: [], notifications: [],
+  subscriptions: [], txCustomStart: null, txCustomEnd: null,
   currentMonthDate: new Date(), filterCategory: '', sort: 'date_desc',
   txViewMode: 'month', txPeriodDate: new Date(),
   categoryChart: null, trendChart: null
@@ -133,18 +146,16 @@ function txInWeek(t, refDate) {
 }
 
 async function loadAll() {
-  const [tx, cats, budgets, subs, notifs] = await Promise.all([
+  const [tx, cats, budgets, subs] = await Promise.all([
     ghGetFile('data/transactions.json'),
     ghGetFile('data/categories.json'),
     ghGetFile('data/budgets.json').catch(() => ({ data: { overall_monthly: null, by_category: {} }, sha: null })),
-    ghGetFile('data/subscriptions.json').catch(() => ({ data: [], sha: null })),
-    ghGetFile('data/notifications_log.json').catch(() => ({ data: [], sha: null }))
+    ghGetFile('data/subscriptions.json').catch(() => ({ data: [], sha: null }))
   ]);
   STATE.transactions = tx.data;
   STATE.categories = cats.data;
   STATE.budgets = budgets.data;
   STATE.subscriptions = subs.data;
-  STATE.notifications = notifs.data;
 
   const filterSel = $('#filter-category');
   filterSel.innerHTML = '<option value="">Tất cả danh mục</option>';
@@ -185,6 +196,7 @@ function renderOverview() {
 
 // ---------- GIAO DICH: dieu huong theo thang HOAC theo tuan ----------
 function updateTxPeriodLabel() {
+  if (STATE.txViewMode === 'custom') return;
   $('#tx-period-label').textContent = STATE.txViewMode === 'week' ? weekLabel(STATE.txPeriodDate) : monthLabel(STATE.txPeriodDate);
 }
 $('#tx-prev-btn').addEventListener('click', () => {
@@ -208,9 +220,26 @@ $('#tx-next-btn').addEventListener('click', () => {
 $$('.view-toggle-btn').forEach(btn => btn.addEventListener('click', () => {
   STATE.txViewMode = btn.dataset.mode;
   $$('.view-toggle-btn').forEach(b => b.classList.toggle('active', b === btn));
+  updateTxModeUI();
+  if (STATE.txViewMode === 'custom' && !STATE.txCustomStart && !STATE.txCustomEnd) {
+    const now = new Date();
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    STATE.txCustomStart = toDateInputValue(firstOfMonth);
+    STATE.txCustomEnd = toDateInputValue(now);
+    $('#tx-date-start').value = STATE.txCustomStart;
+    $('#tx-date-end').value = STATE.txCustomEnd;
+  }
   updateTxPeriodLabel();
   safeRender('tx-list', () => renderTxList());
 }));
+$('#tx-date-start').addEventListener('change', (e) => {
+  STATE.txCustomStart = e.target.value;
+  safeRender('tx-list', () => renderTxList());
+});
+$('#tx-date-end').addEventListener('change', (e) => {
+  STATE.txCustomEnd = e.target.value;
+  safeRender('tx-list', () => renderTxList());
+});
 
 // ---------- RENDER ----------
 function safeRender(name, fn) {
@@ -231,7 +260,6 @@ function renderAll() {
   safeRender('overview', () => renderOverview());
   updateTxPeriodLabel();
   safeRender('tx-list', () => renderTxList());
-  safeRender('notifications', () => renderNotifications());
 }
 
 function renderSummary(monthKey) {
@@ -395,9 +423,14 @@ function renderTrendChart() {
 }
 
 function renderTxList() {
-  let list = STATE.txViewMode === 'week'
-    ? STATE.transactions.filter(t => txInWeek(t, STATE.txPeriodDate))
-    : STATE.transactions.filter(t => txInMonth(t, monthKeyFromDate(STATE.txPeriodDate)));
+  let list;
+  if (STATE.txViewMode === 'week') {
+    list = STATE.transactions.filter(t => txInWeek(t, STATE.txPeriodDate));
+  } else if (STATE.txViewMode === 'custom') {
+    list = STATE.transactions.filter(t => txInRange(t, STATE.txCustomStart, STATE.txCustomEnd));
+  } else {
+    list = STATE.transactions.filter(t => txInMonth(t, monthKeyFromDate(STATE.txPeriodDate)));
+  }
   if (STATE.filterCategory) list = list.filter(t => t.category === STATE.filterCategory);
   const sortFns = {
     date_desc: (a, b) => parseTxDate(b.thoi_gian_giao_dich) - parseTxDate(a.thoi_gian_giao_dich),
@@ -432,24 +465,6 @@ function renderTxList() {
     item.addEventListener('click', () => openLabelModal(t));
     container.appendChild(item);
   });
-}
-
-function renderNotifications() {
-  const list = STATE.notifications || [];
-  const container = $('#notif-list');
-  const empty = $('#notif-empty');
-  container.innerHTML = '';
-  empty.style.display = list.length === 0 ? 'block' : 'none';
-  list.forEach(n => {
-    const item = document.createElement('div');
-    item.className = 'notif-item';
-    item.innerHTML = `<div class="notif-title">🔔 ${n.title}</div><div class="notif-body">${n.body}</div><div class="notif-time">${fmtDateTime(n.sent_at)}</div>`;
-    container.appendChild(item);
-  });
-  const unreadCount = STATE.transactions.filter(t => !t.labeled).length;
-  const badge = $('#notif-badge');
-  if (unreadCount > 0) { badge.style.display = 'inline-block'; badge.textContent = unreadCount; }
-  else { badge.style.display = 'none'; }
 }
 
 // ---------- LABEL / EDIT / DELETE TRANSACTION ----------

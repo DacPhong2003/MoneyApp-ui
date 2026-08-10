@@ -44,6 +44,9 @@
   }
 
   .month-nav { display: flex; align-items: center; justify-content: space-between; margin: 4px 16px 14px; }
+  .date-range-bar { display: flex; align-items: center; gap: 8px; margin: 4px 16px 14px; }
+  .date-range-bar input[type=date] { flex: 1; background: var(--card-2); border: 1px solid var(--border); color: var(--text); border-radius: 9px; padding: 8px 10px; }
+  .date-range-bar .sep { color: var(--muted); }
   .month-nav button { background: var(--card-2); border: 1px solid var(--border); color: var(--text); width: 34px; height: 34px; border-radius: 9px; font-size: 15px; }
   .month-nav .month-label { font-size: 15px; font-weight: 700; }
 
@@ -92,10 +95,6 @@
   .empty-state-big .title { font-size: 14.5px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
   .empty-state-big .sub { font-size: 12.5px; color: var(--muted); }
 
-  .notif-item { background: var(--card); border: 1px solid var(--border); border-radius: 13px; padding: 12px 14px; margin-bottom: 8px; }
-  .notif-title { font-size: 13.5px; font-weight: 700; }
-  .notif-body { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .notif-time { font-size: 10.5px; color: var(--muted); margin-top: 6px; }
 
   .sub-item { display: flex; justify-content: space-between; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 11px 14px; margin-bottom: 8px; }
   .sub-item .sub-name { font-size: 13.5px; font-weight: 600; }
@@ -197,11 +196,17 @@
   <div class="view-toggle">
     <button class="view-toggle-btn active" data-mode="month">Theo tháng</button>
     <button class="view-toggle-btn" data-mode="week">Theo tuần</button>
+    <button class="view-toggle-btn" data-mode="custom">Khoảng ngày</button>
   </div>
-  <div class="month-nav">
+  <div class="month-nav" id="tx-month-nav">
     <button id="tx-prev-btn">‹</button>
     <div class="month-label" id="tx-period-label">Tháng 8/2026</div>
     <button id="tx-next-btn">›</button>
+  </div>
+  <div class="date-range-bar" id="tx-date-range-bar" style="display:none;">
+    <input type="date" id="tx-date-start">
+    <span class="sep">–</span>
+    <input type="date" id="tx-date-end">
   </div>
   <section style="margin-top:0;">
     <div class="filter-bar">
@@ -219,19 +224,6 @@
       <div class="icon">📋</div>
       <div class="title">Không có giao dịch nào</div>
       <div class="sub">Không khớp bộ lọc hiện tại, hoặc chưa có giao dịch trong khoảng thời gian này.</div>
-    </div>
-  </section>
-</div>
-
-<!-- TRANG THONG BAO -->
-<div class="page" id="page-notifications">
-  <section style="margin-top:16px;">
-    <h2>Lịch sử thông báo đẩy</h2>
-    <div id="notif-list"></div>
-    <div id="notif-empty" class="empty-state-big" style="display:none;">
-      <div class="icon">🔔</div>
-      <div class="title">Chưa có thông báo nào</div>
-      <div class="sub">Thông báo sẽ xuất hiện ở đây mỗi khi có giao dịch mới được quét.</div>
     </div>
   </section>
 </div>
@@ -279,7 +271,6 @@
 <div class="tabbar">
   <button class="tab-btn active" data-page="page-overview"><span class="tab-icon">📊</span>Tổng quan</button>
   <button class="tab-btn" data-page="page-transactions"><span class="tab-icon">📋</span>Giao dịch</button>
-  <button class="tab-btn" data-page="page-notifications"><span class="tab-icon">🔔</span>Thông báo<span class="tab-badge" id="notif-badge" style="display:none;"></span></button>
   <button class="tab-btn" data-page="page-settings"><span class="tab-icon">⚙️</span>Cài đặt</button>
 </div>
 
