@@ -47,6 +47,12 @@
   .date-range-bar { display: flex; align-items: center; gap: 8px; margin: 4px 16px 14px; }
   .date-range-bar input[type=date] { flex: 1; background: var(--card-2); border: 1px solid var(--border); color: var(--text); border-radius: 9px; padding: 8px 10px; }
   .date-range-bar .sep { color: var(--muted); }
+  .tx-summary-cards { display: flex; gap: 10px; margin: 0 16px 14px; }
+  .tx-summary-card { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+  .tx-summary-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .tx-summary-value { font-size: 18px; font-weight: 700; }
+  .tx-summary-card.chi .tx-summary-value { color: var(--danger); }
+  .tx-summary-card.thu .tx-summary-value { color: var(--accent); }
   .month-nav button { background: var(--card-2); border: 1px solid var(--border); color: var(--text); width: 34px; height: 34px; border-radius: 9px; font-size: 15px; }
   .month-nav .month-label { font-size: 15px; font-weight: 700; }
 
@@ -207,6 +213,16 @@
     <input type="date" id="tx-date-start">
     <span class="sep">–</span>
     <input type="date" id="tx-date-end">
+  </div>
+  <div class="tx-summary-cards">
+    <div class="tx-summary-card chi">
+      <div class="tx-summary-label">Tổng chi</div>
+      <div class="tx-summary-value" id="tx-summary-chi">0đ</div>
+    </div>
+    <div class="tx-summary-card thu">
+      <div class="tx-summary-label">Tổng thu</div>
+      <div class="tx-summary-value" id="tx-summary-thu">0đ</div>
+    </div>
   </div>
   <section style="margin-top:0;">
     <div class="filter-bar">

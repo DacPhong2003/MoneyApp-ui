@@ -432,6 +432,12 @@ function renderTxList() {
     list = STATE.transactions.filter(t => txInMonth(t, monthKeyFromDate(STATE.txPeriodDate)));
   }
   if (STATE.filterCategory) list = list.filter(t => t.category === STATE.filterCategory);
+
+  const sumChi = list.filter(isChi).reduce((s, t) => s + Number(t.so_tien || 0), 0);
+  const sumThu = list.filter(isThu).reduce((s, t) => s + Number(t.so_tien || 0), 0);
+  $('#tx-summary-chi').textContent = fmtMoney(sumChi);
+  $('#tx-summary-thu').textContent = fmtMoney(sumThu);
+
   const sortFns = {
     date_desc: (a, b) => parseTxDate(b.thoi_gian_giao_dich) - parseTxDate(a.thoi_gian_giao_dich),
     date_asc: (a, b) => parseTxDate(a.thoi_gian_giao_dich) - parseTxDate(b.thoi_gian_giao_dich),
