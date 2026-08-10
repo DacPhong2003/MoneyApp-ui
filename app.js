@@ -453,7 +453,10 @@ function renderCategoryListPage() {
   const totals = {};
   STATE.categories.forEach(c => { totals[c] = 0; });
   let uncategorized = 0;
-  tx.filter(isChi).forEach(t => {
+  // Giao dich da gan Phi co dinh (subscription_id) hoac Phi khong co dinh
+  // (wallet_id) thi KHONG tinh vao chi tieu theo danh muc nua - de tranh
+  // dem trung 2 lan (da tinh rieng o hang "Tong chi phi da tra" ben duoi).
+  tx.filter(t => isChi(t) && !t.subscription_id && !t.wallet_id).forEach(t => {
     const c = t.category;
     if (c && totals.hasOwnProperty(c)) totals[c] += Number(t.so_tien || 0);
     else if (c) totals[c] = (totals[c] || 0) + Number(t.so_tien || 0);
