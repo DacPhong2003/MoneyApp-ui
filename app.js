@@ -56,8 +56,26 @@ async function ghPutFile(path, dataObj, sha, message) {
     headers: { Authorization: `token ${getToken()}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
+  if (res.status === 409) { const e = new Error('conflict'); e.isConflict = true; throw e; }
   if (!res.ok) { const t = await res.text(); throw new Error(`PUT ${path} that bai: ${res.status} ${t}`); }
   return res.json();
+}
+
+// Doc file moi nhat, ap dung mutateFn(data) -> data moi, roi ghi len GitHub.
+// Neu bi 409 (file da bi doi boi tien trinh khac, vd bot quet Gmail chay ngam)
+// thi tu dong doc lai ban moi nhat va thu lai, toi da maxRetries lan.
+async function ghUpdateJson(path, mutateFn, message, maxRetries = 4) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const fresh = await ghGetFile(path).catch(() => ({ data: null, sha: null }));
+    const newData = mutateFn(fresh.data);
+    try {
+      await ghPutFile(path, newData, fresh.sha, message);
+      return newData;
+    } catch (e) {
+      if (e.isConflict && attempt < maxRetries) continue;
+      throw e;
+    }
+  }
 }
 
 function fmtMoney(n) { return Number(n || 0).toLocaleString('vi-VN') + 'đ'; }
@@ -285,18 +303,20 @@ async function saveSubEdit() {
   if (!amount || amount <= 0) { alert('Nhập số tiền hợp lệ'); return; }
   $('#sub-edit-save-btn').disabled = true;
   try {
-    const fresh = await ghGetFile('data/subscriptions.json');
-    const idx = fresh.data.findIndex(s => s.id === subId);
-    if (idx >= 0) {
-      if (monthKey === '__default__') {
-        fresh.data[idx].default_amount = amount;
-      } else {
-        if (!fresh.data[idx].overrides) fresh.data[idx].overrides = {};
-        fresh.data[idx].overrides[monthKey] = amount;
+    const newData = await ghUpdateJson('data/subscriptions.json', (data) => {
+      const list = data || [];
+      const idx = list.findIndex(s => s.id === subId);
+      if (idx >= 0) {
+        if (monthKey === '__default__') {
+          list[idx].default_amount = amount;
+        } else {
+          if (!list[idx].overrides) list[idx].overrides = {};
+          list[idx].overrides[monthKey] = amount;
+        }
       }
-    }
-    await ghPutFile('data/subscriptions.json', fresh.data, fresh.sha, `update subscription ${subId} (${monthKey})`);
-    STATE.subscriptions = fresh.data;
+      return list;
+    }, `update subscription ${subId} (${monthKey})`);
+    STATE.subscriptions = newData;
     closeModal(modal);
     renderSubsSummary(monthKeyFromDate(STATE.currentMonthDate));
     renderSubsList();
@@ -459,11 +479,13 @@ async function saveLabel() {
   if (!cat) { alert('Chọn 1 danh mục'); return; }
   $('#save-label-btn').disabled = true;
   try {
-    const fresh = await ghGetFile('data/transactions.json');
-    const idx = fresh.data.findIndex(t => t.id === txId);
-    if (idx >= 0) { fresh.data[idx].category = cat; fresh.data[idx].note = note; fresh.data[idx].labeled = true; }
-    await ghPutFile('data/transactions.json', fresh.data, fresh.sha, `label: ${txId}`);
-    STATE.transactions = fresh.data;
+    const newData = await ghUpdateJson('data/transactions.json', (data) => {
+      const list = data || [];
+      const idx = list.findIndex(t => t.id === txId);
+      if (idx >= 0) { list[idx].category = cat; list[idx].note = note; list[idx].labeled = true; }
+      return list;
+    }, `label: ${txId}`);
+    STATE.transactions = newData;
     closeModal(modal);
     renderAll();
   } catch (e) { alert('Lưu thất bại: ' + e.message); }
@@ -476,10 +498,8 @@ async function deleteTx() {
   if (!confirm('Xoá giao dịch này? Không thể hoàn tác.')) return;
   $('#delete-tx-btn').disabled = true;
   try {
-    const fresh = await ghGetFile('data/transactions.json');
-    const newList = fresh.data.filter(t => t.id !== txId);
-    await ghPutFile('data/transactions.json', newList, fresh.sha, `delete: ${txId}`);
-    STATE.transactions = newList;
+    const newData = await ghUpdateJson('data/transactions.json', (data) => (data || []).filter(t => t.id !== txId), `delete: ${txId}`);
+    STATE.transactions = newData;
     closeModal(modal);
     renderAll();
   } catch (e) { alert('Xoá thất bại: ' + e.message); }
@@ -504,11 +524,11 @@ async function enablePush() {
   let sub = await reg.pushManager.getSubscription();
   if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) });
   const subJson = sub.toJSON();
-  const fresh = await ghGetFile('data/push_subscriptions.json');
-  if (!fresh.data.some(s => s.endpoint === subJson.endpoint)) {
-    fresh.data.push(subJson);
-    await ghPutFile('data/push_subscriptions.json', fresh.data, fresh.sha, 'add push subscription');
-  }
+  await ghUpdateJson('data/push_subscriptions.json', (data) => {
+    const list = data || [];
+    if (!list.some(s => s.endpoint === subJson.endpoint)) list.push(subJson);
+    return list;
+  }, 'add push subscription');
   $('#push-status').textContent = 'Đã bật thông báo trên thiết bị này';
 }
 
@@ -539,8 +559,7 @@ async function saveBudgets() {
   const newBudgets = { overall_monthly: overall, by_category: byCat };
   $('#save-budget-btn').disabled = true;
   try {
-    const fresh = await ghGetFile('data/budgets.json').catch(() => ({ data: null, sha: null }));
-    await ghPutFile('data/budgets.json', newBudgets, fresh.sha, 'update budgets');
+    await ghUpdateJson('data/budgets.json', () => newBudgets, 'update budgets');
     STATE.budgets = newBudgets;
     renderAll();
     alert('Đã lưu ngân sách');
@@ -574,10 +593,12 @@ async function addCategory() {
   if (STATE.categories.includes(name)) { alert('Danh mục đã tồn tại'); return; }
   $('#add-category-btn').disabled = true;
   try {
-    const fresh = await ghGetFile('data/categories.json');
-    fresh.data.push(name);
-    await ghPutFile('data/categories.json', fresh.data, fresh.sha, `add category: ${name}`);
-    STATE.categories = fresh.data;
+    const newData = await ghUpdateJson('data/categories.json', (data) => {
+      const list = data || [];
+      if (!list.includes(name)) list.push(name);
+      return list;
+    }, `add category: ${name}`);
+    STATE.categories = newData;
     input.value = '';
     renderCategoryTags();
     renderBudgetInputs();
@@ -590,10 +611,8 @@ async function addCategory() {
 async function removeCategory(cat) {
   if (!confirm(`Xoá danh mục "${cat}"? Các giao dịch đã gắn nhãn này vẫn giữ nguyên tên cũ.`)) return;
   try {
-    const fresh = await ghGetFile('data/categories.json');
-    const newList = fresh.data.filter(c => c !== cat);
-    await ghPutFile('data/categories.json', newList, fresh.sha, `remove category: ${cat}`);
-    STATE.categories = newList;
+    const newData = await ghUpdateJson('data/categories.json', (data) => (data || []).filter(c => c !== cat), `remove category: ${cat}`);
+    STATE.categories = newData;
     renderCategoryTags();
     renderBudgetInputs();
   } catch (e) { alert('Xoá thất bại: ' + e.message); }
@@ -637,10 +656,12 @@ async function addSubscription() {
   if (!name || !amount) { alert('Nhập đủ tên và số tiền'); return; }
   $('#add-sub-btn').disabled = true;
   try {
-    const fresh = await ghGetFile('data/subscriptions.json').catch(() => ({ data: [], sha: null }));
-    fresh.data.push({ id: 'sub_' + Date.now(), name, default_amount: amount, category, overrides: {} });
-    await ghPutFile('data/subscriptions.json', fresh.data, fresh.sha, `add subscription: ${name}`);
-    STATE.subscriptions = fresh.data;
+    const newData = await ghUpdateJson('data/subscriptions.json', (data) => {
+      const list = data || [];
+      list.push({ id: 'sub_' + Date.now(), name, default_amount: amount, category, overrides: {} });
+      return list;
+    }, `add subscription: ${name}`);
+    STATE.subscriptions = newData;
     $('#sub-name-input').value = ''; $('#sub-amount-input').value = '';
     renderSubsList();
     renderSubsSummary(monthKeyFromDate(STATE.currentMonthDate));
@@ -650,12 +671,10 @@ async function addSubscription() {
 async function removeSubscription(id) {
   if (!confirm('Xoá khoản cố định này?')) return;
   try {
-    const fresh = await ghGetFile('data/subscriptions.json');
-    const newList = fresh.data.filter(s => s.id !== id);
-    await ghPutFile('data/subscriptions.json', newList, fresh.sha, `remove subscription: ${id}`);
-    STATE.subscriptions = newList;
+    const newData = await ghUpdateJson('data/subscriptions.json', (data) => (data || []).filter(s => s.id !== id), `remove subscription: ${id}`);
+    STATE.subscriptions = newData;
     renderSubsList();
-    renderSubsSummary();
+    renderSubsSummary(monthKeyFromDate(STATE.currentMonthDate));
   } catch (e) { alert('Xoá thất bại: ' + e.message); }
 }
 $('#add-sub-btn').addEventListener('click', addSubscription);
