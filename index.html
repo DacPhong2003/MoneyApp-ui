@@ -83,6 +83,7 @@
   .tx-side { text-align: right; flex-shrink: 0; }
   .tx-amount { font-size: 14px; font-weight: 700; }
   .amount-out { color: var(--danger); }
+  .amount-in { color: var(--accent); }
   .tx-cat { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
 
   .empty-state { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 0; }
@@ -162,6 +163,7 @@
   <div class="summary-card">
     <div class="summary-sub">Tổng đã chi</div>
     <div class="summary-total" id="summary-chi">0đ</div>
+    <div class="summary-sub" id="summary-thu-row" style="margin-top:6px; display:none;">Tổng thu: <span id="summary-thu" style="color:var(--accent); font-weight:700;">0đ</span></div>
     <div class="budget-bar-track" id="budget-bar-wrap" style="display:none;">
       <div class="budget-bar-fill" id="budget-bar-fill"></div>
     </div>

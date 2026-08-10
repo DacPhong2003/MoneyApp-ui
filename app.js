@@ -88,6 +88,8 @@ function parseTxDate(iso) {
   return new Date(iso);
 }
 function monthKeyFromDate(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+function isThu(t) { return t.chieu === 'thu'; }
+function isChi(t) { return !isThu(t); }
 function monthLabel(d) { return `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`; }
 function fmtTxTime(raw) {
   const d = parseTxDate(raw);
@@ -234,8 +236,12 @@ function renderAll() {
 
 function renderSummary(monthKey) {
   const monthTx = STATE.transactions.filter(t => txInMonth(t, monthKey));
-  const chi = monthTx.reduce((s, t) => s + Number(t.so_tien || 0), 0);
+  const chi = monthTx.filter(isChi).reduce((s, t) => s + Number(t.so_tien || 0), 0);
+  const thu = monthTx.filter(isThu).reduce((s, t) => s + Number(t.so_tien || 0), 0);
   $('#summary-chi').textContent = fmtMoney(chi);
+  const thuRow = $('#summary-thu-row');
+  if (thu > 0) { thuRow.style.display = 'block'; $('#summary-thu').textContent = fmtMoney(thu); }
+  else { thuRow.style.display = 'none'; }
 
   const budget = STATE.budgets.overall_monthly;
   const wrap = $('#budget-bar-wrap');
@@ -327,7 +333,7 @@ $('#sub-edit-save-btn').addEventListener('click', saveSubEdit);
 $('#sub-edit-close-btn').addEventListener('click', () => { closeModal($('#sub-edit-modal')); });
 
 function renderCategoryChart(monthKey) {
-  const monthTx = STATE.transactions.filter(t => txInMonth(t, monthKey));
+  const monthTx = STATE.transactions.filter(t => txInMonth(t, monthKey) && isChi(t));
   const byCat = {};
   monthTx.forEach(t => {
     const c = t.category || 'Chưa phân loại';
@@ -374,7 +380,7 @@ function renderTrendChart() {
     const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
     months.push({ key: monthKeyFromDate(d), label: `T${d.getMonth() + 1}` });
   }
-  const totals = months.map(m => STATE.transactions.filter(t => txInMonth(t, m.key)).reduce((s, t) => s + Number(t.so_tien || 0), 0));
+  const totals = months.map(m => STATE.transactions.filter(t => txInMonth(t, m.key) && isChi(t)).reduce((s, t) => s + Number(t.so_tien || 0), 0));
   const canvas = $('#trend-chart');
   if (typeof Chart === 'undefined') return;
   if (STATE.trendChart) STATE.trendChart.destroy();
@@ -420,7 +426,7 @@ function renderTxList() {
         </div>
       </div>
       <div class="tx-side">
-        <div class="tx-amount amount-out">-${fmtMoney(t.so_tien)}</div>
+        <div class="tx-amount ${isThu(t) ? 'amount-in' : 'amount-out'}">${isThu(t) ? '+' : '-'}${fmtMoney(t.so_tien)}</div>
         <div class="tx-cat">${t.category || 'Bấm để gắn nhãn'}</div>
       </div>`;
     item.addEventListener('click', () => openLabelModal(t));
