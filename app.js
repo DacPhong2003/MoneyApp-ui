@@ -64,8 +64,13 @@ async function ghPutFile(path, dataObj, sha, message) {
 // Doc file moi nhat, ap dung mutateFn(data) -> data moi, roi ghi len GitHub.
 // Neu bi 409 (file da bi doi boi tien trinh khac, vd bot quet Gmail chay ngam)
 // thi tu dong doc lai ban moi nhat va thu lai, toi da maxRetries lan.
-async function ghUpdateJson(path, mutateFn, message, maxRetries = 4) {
+async function ghUpdateJson(path, mutateFn, message, maxRetries = 5) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      // Doi tang dan truoc khi thu lai, tranh doc phai ban cu do GitHub
+      // API doi khi tra ve du lieu chua kip dong bo ngay sau lan ghi truoc.
+      await new Promise((r) => setTimeout(r, 400 * attempt));
+    }
     const fresh = await ghGetFile(path).catch(() => ({ data: null, sha: null }));
     const newData = mutateFn(fresh.data);
     try {
