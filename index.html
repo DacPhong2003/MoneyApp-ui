@@ -53,6 +53,7 @@
   .tx-summary-value { font-size: 18px; font-weight: 700; }
   .tx-summary-card.chi .tx-summary-value { color: var(--danger); }
   .tx-summary-card.thu .tx-summary-value { color: var(--accent); }
+  .stat-cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 16px 14px; }
   .month-nav button { background: var(--card-2); border: 1px solid var(--border); color: var(--text); width: 34px; height: 34px; border-radius: 9px; font-size: 15px; }
   .month-nav .month-label { font-size: 15px; font-weight: 700; }
 
@@ -68,9 +69,9 @@
   section { margin: 0 16px 18px; }
   section h2 { font-size: 14px; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
   .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
-  .cat-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+  .cat-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
   .cat-row:last-child { border-bottom: none; }
-  .cat-left { display: flex; align-items: center; gap: 8px; }
+  .cat-left { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cat-dot { width: 9px; height: 9px; border-radius: 50%; }
   .cat-amount { font-weight: 700; }
   .cat-budget-mini { font-size: 11px; color: var(--muted); }
@@ -102,9 +103,11 @@
   .empty-state-big .sub { font-size: 12.5px; color: var(--muted); }
 
 
-  .sub-item { display: flex; justify-content: space-between; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 11px 14px; margin-bottom: 8px; }
-  .sub-item .sub-name { font-size: 13.5px; font-weight: 600; }
-  .sub-item .sub-meta { font-size: 11px; color: var(--muted); }
+  .sub-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 11px 14px; margin-bottom: 8px; }
+  .sub-item > div:first-child { flex: 1; min-width: 0; }
+  .sub-item > div:last-child { flex-shrink: 0; }
+  .sub-item .sub-name { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sub-item .sub-meta { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sub-item .sub-amount { font-size: 13.5px; font-weight: 700; }
   .sub-remove { background: none; border: none; color: var(--danger); font-size: 18px; padding: 0 4px; margin-left: 8px; }
 
@@ -118,7 +121,7 @@
   .chip { background: var(--card-2); color: var(--text); border: 1px solid var(--border); border-radius: 20px; padding: 8px 13px; font-size: 12.5px; }
   .chip-selected { background: var(--accent); color: #0b1020; border-color: var(--accent); font-weight: 700; }
   input, textarea, select {
-    width: 100%; background: #0b1020; border: 1px solid var(--border); color: var(--text);
+    width: 100%; max-width: 100%; min-width: 0; background: #0b1020; border: 1px solid var(--border); color: var(--text);
     border-radius: 10px; padding: 11px; font-size: 16px; margin-bottom: 12px; font-family: inherit;
   }
   label, .field-label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; }
@@ -127,11 +130,12 @@
   .btn-secondary { width: 100%; background: transparent; color: var(--muted); border: none; padding: 10px; font-size: 13.5px; margin-top: 4px; }
   #push-status { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
 
-  .settings-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+  .settings-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 16px; max-width: 100%; overflow: hidden; }
   .settings-card h3 { font-size: 13.5px; color: var(--muted); margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.3px; }
   .budget-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-  .budget-row span { flex: 1; font-size: 13px; }
-  .budget-row input { margin-bottom: 0; width: 110px; }
+  .budget-row span { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .budget-row input { margin-bottom: 0; width: 110px; flex-shrink: 0; }
+  .stat-readonly { width: 100%; background: #0b1020; border: 1px solid var(--border); border-radius: 10px; padding: 11px; font-size: 16px; margin-bottom: 12px; font-weight: 700; color: var(--text); }
   .inline-form { display: flex; gap: 8px; align-items: flex-end; }
   .inline-form > div { flex: 1; }
   .inline-form input, .inline-form select { margin-bottom: 0; }
@@ -279,6 +283,26 @@
     <span class="sep">–</span>
     <input type="date" id="cat-date-end">
   </div>
+
+  <div class="stat-cards-grid" id="cat-stat-cards" style="display:none;">
+    <div class="tx-summary-card chi">
+      <div class="tx-summary-label">Tổng chi</div>
+      <div class="tx-summary-value" id="stat-tong-chi">0đ</div>
+    </div>
+    <div class="tx-summary-card">
+      <div class="tx-summary-label">Tổng ngân sách</div>
+      <div class="tx-summary-value" id="stat-tong-ns">0đ</div>
+    </div>
+    <div class="tx-summary-card thu">
+      <div class="tx-summary-label">Còn lại</div>
+      <div class="tx-summary-value" id="stat-con-lai">0đ</div>
+    </div>
+    <div class="tx-summary-card">
+      <div class="tx-summary-label">Đã tiêu</div>
+      <div class="tx-summary-value" id="stat-da-tieu-pct">0%</div>
+    </div>
+  </div>
+
   <section style="margin-top:0;">
     <div class="chart-card" id="cat-list-card"></div>
   </section>
@@ -309,8 +333,8 @@
       <div id="budget-months-list" style="margin-bottom:12px;"></div>
       <div class="field-label">Chọn tháng</div>
       <input type="month" id="budget-month-input">
-      <div class="field-label" style="margin-top:10px;">Ngân sách tổng</div>
-      <input id="budget-overall-input" type="number" placeholder="VD: 5000000">
+      <div class="field-label" style="margin-top:10px;">Ngân sách tổng (tự tính từ các danh mục)</div>
+      <div class="stat-readonly" id="budget-overall-display">0đ</div>
       <h3 style="margin-top:14px;">Ngân sách theo danh mục</h3>
       <div id="budget-by-category"></div>
       <button id="save-budget-btn" class="btn-primary" style="margin-top:8px;">Lưu ngân sách</button>

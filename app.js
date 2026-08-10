@@ -426,7 +426,8 @@ function renderWalletsSection(monthKey) {
 }
 
 function renderCategoryListPage() {
-  if (STATE.catViewMode === 'month') {
+  const isMonthMode = STATE.catViewMode === 'month';
+  if (isMonthMode) {
     const mk = catRelevantMonthKey();
     renderSubsSummary(mk, '#cat-subs-section', '#cat-subs-card');
     renderWalletsSection(mk);
@@ -438,7 +439,7 @@ function renderCategoryListPage() {
   const totals = {};
   STATE.categories.forEach(c => { totals[c] = 0; });
   let uncategorized = 0;
-  tx.forEach(t => {
+  tx.filter(isChi).forEach(t => {
     const c = t.category;
     if (c && totals.hasOwnProperty(c)) totals[c] += Number(t.so_tien || 0);
     else if (c) totals[c] = (totals[c] || 0) + Number(t.so_tien || 0);
@@ -446,8 +447,34 @@ function renderCategoryListPage() {
   });
   const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
 
+  const statGrid = $('#cat-stat-cards');
+  if (isMonthMode) {
+    const mk = catRelevantMonthKey();
+    statGrid.style.display = 'grid';
+    const categorySpentTotal = entries.reduce((s, [, amt]) => s + amt, 0) + uncategorized;
+    const categoryBudgetTotal = Object.values(getBudgetForMonth(mk).by_category || {}).reduce((s, v) => s + Number(v || 0), 0);
+    const subsPaidTotal = STATE.subscriptions.reduce((s, sub) => s + (isSubPaidInMonth(sub.id, mk) ? subEffectiveAmount(sub, mk) : 0), 0);
+    const subsAllTotal = STATE.subscriptions.reduce((s, sub) => s + subEffectiveAmount(sub, mk), 0);
+    const walletsThisMonth = (STATE.wallets || []).filter(w => w.month === mk);
+    const walletsPaidTotal = walletsThisMonth.reduce((s, w) => s + (isWalletPaid(w.id, mk) ? Number(w.amount || 0) : 0), 0);
+    const walletsAllTotal = walletsThisMonth.reduce((s, w) => s + Number(w.amount || 0), 0);
+
+    const tongChi = categorySpentTotal + subsPaidTotal + walletsPaidTotal;
+    const tongNganSach = categoryBudgetTotal + subsAllTotal + walletsAllTotal;
+    const conLai = tongNganSach - tongChi;
+    const daTieuPct = tongNganSach > 0 ? Math.round((tongChi / tongNganSach) * 100) : 0;
+
+    $('#stat-tong-chi').textContent = fmtMoney(tongChi);
+    $('#stat-tong-ns').textContent = fmtMoney(tongNganSach);
+    $('#stat-con-lai').textContent = fmtMoney(conLai);
+    $('#stat-con-lai').style.color = conLai < 0 ? 'var(--danger)' : 'var(--accent)';
+    $('#stat-da-tieu-pct').textContent = daTieuPct + '%';
+    $('#stat-da-tieu-pct').style.color = daTieuPct > 100 ? 'var(--danger)' : (daTieuPct >= 80 ? 'var(--warn)' : 'var(--accent)');
+  } else {
+    statGrid.style.display = 'none';
+  }
+
   const card = $('#cat-list-card');
-  const isMonthMode = STATE.catViewMode === 'month';
   const mkForBudget = isMonthMode ? catRelevantMonthKey() : null;
   let html = '';
   if (isMonthMode) {
@@ -870,12 +897,17 @@ $('#settings-save-token-btn').addEventListener('click', () => {
 });
 
 // ---------- SETTINGS: BUDGET ----------
+function recomputeBudgetOverallDisplay() {
+  let sum = 0;
+  $$('#budget-by-category input').forEach(inp => { const v = parseFloat(inp.value); if (v > 0) sum += v; });
+  $('#budget-overall-display').textContent = fmtMoney(sum);
+  return sum;
+}
 function renderBudgetInputs() {
   const monthInput = $('#budget-month-input');
   if (!monthInput.value) monthInput.value = monthKeyFromDate(new Date());
   const monthKey = monthInput.value;
   const b = getBudgetForMonth(monthKey);
-  $('#budget-overall-input').value = b.overall || '';
   const wrap = $('#budget-by-category');
   wrap.innerHTML = '';
   STATE.categories.filter(c => c !== 'Thu nhập').forEach(cat => {
@@ -884,6 +916,8 @@ function renderBudgetInputs() {
     row.innerHTML = `<span>${iconFor(cat)} ${cat}</span><input type="number" data-cat="${cat}" placeholder="0" value="${b.by_category?.[cat] || ''}">`;
     wrap.appendChild(row);
   });
+  $$('#budget-by-category input').forEach(inp => inp.addEventListener('input', recomputeBudgetOverallDisplay));
+  recomputeBudgetOverallDisplay();
   renderBudgetMonthsList();
 }
 function renderBudgetMonthsList() {
@@ -914,7 +948,7 @@ function renderBudgetMonthsList() {
 $('#budget-month-input').addEventListener('change', () => renderBudgetInputs());
 async function saveBudgets() {
   const monthKey = $('#budget-month-input').value || monthKeyFromDate(new Date());
-  const overall = parseFloat($('#budget-overall-input').value) || null;
+  const overall = recomputeBudgetOverallDisplay() || null;
   const byCat = {};
   $$('#budget-by-category input').forEach(inp => { const v = parseFloat(inp.value); if (v > 0) byCat[inp.dataset.cat] = v; });
   $('#save-budget-btn').disabled = true;
