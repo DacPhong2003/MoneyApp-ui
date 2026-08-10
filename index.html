@@ -159,16 +159,34 @@
 
 <!-- TRANG TONG QUAN -->
 <div class="page active" id="page-overview">
-  <div class="month-nav">
+  <div class="view-toggle">
+    <button class="view-toggle-btn active" data-mode="month">Theo tháng</button>
+    <button class="view-toggle-btn" data-mode="week">Theo tuần</button>
+    <button class="view-toggle-btn" data-mode="custom">Khoảng ngày</button>
+  </div>
+  <div class="month-nav" id="ov-month-nav">
     <button id="ov-prev-btn">‹</button>
     <div class="month-label" id="ov-month-label">Tháng 8/2026</div>
     <button id="ov-next-btn">›</button>
   </div>
+  <div class="date-range-bar" id="ov-date-range-bar" style="display:none;">
+    <input type="date" id="ov-date-start">
+    <span class="sep">–</span>
+    <input type="date" id="ov-date-end">
+  </div>
 
-  <div class="summary-card">
-    <div class="summary-sub">Tổng đã chi</div>
-    <div class="summary-total" id="summary-chi">0đ</div>
-    <div class="summary-sub" id="summary-thu-row" style="margin-top:6px; display:none;">Tổng thu: <span id="summary-thu" style="color:var(--accent); font-weight:700;">0đ</span></div>
+  <div class="tx-summary-cards">
+    <div class="tx-summary-card chi">
+      <div class="tx-summary-label">Tổng chi</div>
+      <div class="tx-summary-value" id="ov-summary-chi">0đ</div>
+    </div>
+    <div class="tx-summary-card thu">
+      <div class="tx-summary-label">Tổng thu</div>
+      <div class="tx-summary-value" id="ov-summary-thu">0đ</div>
+    </div>
+  </div>
+
+  <div class="summary-card" id="ov-budget-card">
     <div class="budget-bar-track" id="budget-bar-wrap" style="display:none;">
       <div class="budget-bar-fill" id="budget-bar-fill"></div>
     </div>

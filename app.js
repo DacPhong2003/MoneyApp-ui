@@ -117,7 +117,8 @@ function fmtDateTime(iso) {
 let STATE = {
   transactions: [], categories: [], budgets: { overall_monthly: null, by_category: {} },
   subscriptions: [], txCustomStart: null, txCustomEnd: null,
-  currentMonthDate: new Date(), filterCategory: '', sort: 'date_desc',
+  ovViewMode: 'month', ovPeriodDate: new Date(), ovCustomStart: null, ovCustomEnd: null,
+  filterCategory: '', sort: 'date_desc',
   txViewMode: 'month', txPeriodDate: new Date(),
   categoryChart: null, trendChart: null
 };
@@ -167,6 +168,19 @@ async function loadAll() {
 }
 
 function txInMonth(t, monthKey) { return monthKeyFromDate(parseTxDate(t.thoi_gian_giao_dich)) === monthKey; }
+function getOverviewTx() {
+  if (STATE.ovViewMode === 'week') {
+    return STATE.transactions.filter(t => txInWeek(t, STATE.ovPeriodDate));
+  } else if (STATE.ovViewMode === 'custom') {
+    return STATE.transactions.filter(t => txInRange(t, STATE.ovCustomStart, STATE.ovCustomEnd));
+  }
+  return STATE.transactions.filter(t => txInMonth(t, monthKeyFromDate(STATE.ovPeriodDate)));
+}
+function updateOvModeUI() {
+  const isCustom = STATE.ovViewMode === 'custom';
+  $('#ov-month-nav').style.display = isCustom ? 'none' : 'flex';
+  $('#ov-date-range-bar').style.display = isCustom ? 'flex' : 'none';
+}
 
 // ---------- TAB NAVIGATION ----------
 function switchTab(pageId) {
@@ -175,22 +189,58 @@ function switchTab(pageId) {
 }
 $$('.tab-btn').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.page)));
 
-// ---------- OVERVIEW: dieu huong theo thang ----------
-function updateOverviewLabel() { $('#ov-month-label').textContent = monthLabel(STATE.currentMonthDate); }
+// ---------- OVERVIEW: dieu huong theo thang / tuan / khoang ngay ----------
+function updateOverviewLabel() {
+  if (STATE.ovViewMode === 'custom') return;
+  $('#ov-month-label').textContent = STATE.ovViewMode === 'week' ? weekLabel(STATE.ovPeriodDate) : monthLabel(STATE.ovPeriodDate);
+}
 $('#ov-prev-btn').addEventListener('click', () => {
-  STATE.currentMonthDate = new Date(STATE.currentMonthDate.getFullYear(), STATE.currentMonthDate.getMonth() - 1, 1);
+  if (STATE.ovViewMode === 'week') {
+    STATE.ovPeriodDate = new Date(STATE.ovPeriodDate.getFullYear(), STATE.ovPeriodDate.getMonth(), STATE.ovPeriodDate.getDate() - 7);
+  } else {
+    STATE.ovPeriodDate = new Date(STATE.ovPeriodDate.getFullYear(), STATE.ovPeriodDate.getMonth() - 1, 1);
+  }
   renderOverview();
 });
 $('#ov-next-btn').addEventListener('click', () => {
-  STATE.currentMonthDate = new Date(STATE.currentMonthDate.getFullYear(), STATE.currentMonthDate.getMonth() + 1, 1);
+  if (STATE.ovViewMode === 'week') {
+    STATE.ovPeriodDate = new Date(STATE.ovPeriodDate.getFullYear(), STATE.ovPeriodDate.getMonth(), STATE.ovPeriodDate.getDate() + 7);
+  } else {
+    STATE.ovPeriodDate = new Date(STATE.ovPeriodDate.getFullYear(), STATE.ovPeriodDate.getMonth() + 1, 1);
+  }
+  renderOverview();
+});
+$$('#page-overview .view-toggle-btn').forEach(btn => btn.addEventListener('click', () => {
+  STATE.ovViewMode = btn.dataset.mode;
+  $$('#page-overview .view-toggle-btn').forEach(b => b.classList.toggle('active', b === btn));
+  updateOvModeUI();
+  if (STATE.ovViewMode === 'custom' && !STATE.ovCustomStart && !STATE.ovCustomEnd) {
+    const now = new Date();
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    STATE.ovCustomStart = toDateInputValue(firstOfMonth);
+    STATE.ovCustomEnd = toDateInputValue(now);
+    $('#ov-date-start').value = STATE.ovCustomStart;
+    $('#ov-date-end').value = STATE.ovCustomEnd;
+  }
+  renderOverview();
+}));
+$('#ov-date-start').addEventListener('change', (e) => {
+  STATE.ovCustomStart = e.target.value;
+  renderOverview();
+});
+$('#ov-date-end').addEventListener('change', (e) => {
+  STATE.ovCustomEnd = e.target.value;
   renderOverview();
 });
 function renderOverview() {
-  const monthKey = monthKeyFromDate(STATE.currentMonthDate);
   updateOverviewLabel();
-  safeRender('summary', () => renderSummary(monthKey));
-  safeRender('subs-summary', () => renderSubsSummary(monthKey));
-  safeRender('category-chart', () => renderCategoryChart(monthKey));
+  const isMonth = STATE.ovViewMode === 'month';
+  $('#subs-summary-section').style.display = isMonth && STATE.subscriptions.length > 0 ? 'block' : 'none';
+  $('#ov-budget-card').style.display = isMonth ? 'block' : 'none';
+  const tx = getOverviewTx();
+  safeRender('summary', () => renderSummary(tx));
+  if (isMonth) safeRender('subs-summary', () => renderSubsSummary(monthKeyFromDate(STATE.ovPeriodDate)));
+  safeRender('category-chart', () => renderCategoryChart(tx));
   safeRender('trend-chart', () => renderTrendChart());
 }
 
@@ -217,9 +267,9 @@ $('#tx-next-btn').addEventListener('click', () => {
   updateTxPeriodLabel();
   safeRender('tx-list', () => renderTxList());
 });
-$$('.view-toggle-btn').forEach(btn => btn.addEventListener('click', () => {
+$$('#page-transactions .view-toggle-btn').forEach(btn => btn.addEventListener('click', () => {
   STATE.txViewMode = btn.dataset.mode;
-  $$('.view-toggle-btn').forEach(b => b.classList.toggle('active', b === btn));
+  $$('#page-transactions .view-toggle-btn').forEach(b => b.classList.toggle('active', b === btn));
   updateTxModeUI();
   if (STATE.txViewMode === 'custom' && !STATE.txCustomStart && !STATE.txCustomEnd) {
     const now = new Date();
@@ -262,14 +312,13 @@ function renderAll() {
   safeRender('tx-list', () => renderTxList());
 }
 
-function renderSummary(monthKey) {
-  const monthTx = STATE.transactions.filter(t => txInMonth(t, monthKey));
-  const chi = monthTx.filter(isChi).reduce((s, t) => s + Number(t.so_tien || 0), 0);
-  const thu = monthTx.filter(isThu).reduce((s, t) => s + Number(t.so_tien || 0), 0);
-  $('#summary-chi').textContent = fmtMoney(chi);
-  const thuRow = $('#summary-thu-row');
-  if (thu > 0) { thuRow.style.display = 'block'; $('#summary-thu').textContent = fmtMoney(thu); }
-  else { thuRow.style.display = 'none'; }
+function renderSummary(tx) {
+  const chi = tx.filter(isChi).reduce((s, t) => s + Number(t.so_tien || 0), 0);
+  const thu = tx.filter(isThu).reduce((s, t) => s + Number(t.so_tien || 0), 0);
+  $('#ov-summary-chi').textContent = fmtMoney(chi);
+  $('#ov-summary-thu').textContent = fmtMoney(thu);
+
+  if (STATE.ovViewMode !== 'month') return;
 
   const budget = STATE.budgets.overall_monthly;
   const wrap = $('#budget-bar-wrap');
@@ -299,7 +348,7 @@ function renderSubsSummary(monthKey) {
   const card = $('#subs-summary-card');
   if (!STATE.subscriptions || STATE.subscriptions.length === 0) { section.style.display = 'none'; return; }
   section.style.display = 'block';
-  monthKey = monthKey || monthKeyFromDate(STATE.currentMonthDate);
+  monthKey = monthKey || monthKeyFromDate(STATE.ovPeriodDate);
   let total = 0;
   card.innerHTML = STATE.subscriptions.map(s => {
     const amt = subEffectiveAmount(s, monthKey);
@@ -324,7 +373,7 @@ function openSubEditModal(subId, monthKey) {
   const modal = $('#sub-edit-modal');
   modal.dataset.subId = subId;
   modal.dataset.monthKey = monthKey;
-  $('#sub-edit-title').textContent = `${sub.name} — ${monthLabel(STATE.currentMonthDate)}`;
+  $('#sub-edit-title').textContent = `${sub.name} — ${monthLabel(STATE.ovPeriodDate)}`;
   $('#sub-edit-amount-input').value = subEffectiveAmount(sub, monthKey);
   openModal(modal);
 }
@@ -352,7 +401,7 @@ async function saveSubEdit() {
     }, `update subscription ${subId} (${monthKey})`);
     STATE.subscriptions = newData;
     closeModal(modal);
-    renderSubsSummary(monthKeyFromDate(STATE.currentMonthDate));
+    renderSubsSummary(monthKeyFromDate(STATE.ovPeriodDate));
     renderSubsList();
   } catch (e) { alert('Lưu thất bại: ' + e.message); }
   finally { $('#sub-edit-save-btn').disabled = false; }
@@ -360,8 +409,8 @@ async function saveSubEdit() {
 $('#sub-edit-save-btn').addEventListener('click', saveSubEdit);
 $('#sub-edit-close-btn').addEventListener('click', () => { closeModal($('#sub-edit-modal')); });
 
-function renderCategoryChart(monthKey) {
-  const monthTx = STATE.transactions.filter(t => txInMonth(t, monthKey) && isChi(t));
+function renderCategoryChart(tx) {
+  const monthTx = tx.filter(isChi);
   const byCat = {};
   monthTx.forEach(t => {
     const c = t.category || 'Chưa phân loại';
@@ -691,7 +740,7 @@ async function addSubscription() {
     STATE.subscriptions = newData;
     $('#sub-name-input').value = ''; $('#sub-amount-input').value = '';
     renderSubsList();
-    renderSubsSummary(monthKeyFromDate(STATE.currentMonthDate));
+    renderSubsSummary(monthKeyFromDate(STATE.ovPeriodDate));
   } catch (e) { alert('Thêm thất bại: ' + e.message); }
   finally { $('#add-sub-btn').disabled = false; }
 }
@@ -701,7 +750,7 @@ async function removeSubscription(id) {
     const newData = await ghUpdateJson('data/subscriptions.json', (data) => (data || []).filter(s => s.id !== id), `remove subscription: ${id}`);
     STATE.subscriptions = newData;
     renderSubsList();
-    renderSubsSummary(monthKeyFromDate(STATE.currentMonthDate));
+    renderSubsSummary(monthKeyFromDate(STATE.ovPeriodDate));
   } catch (e) { alert('Xoá thất bại: ' + e.message); }
 }
 $('#add-sub-btn').addEventListener('click', addSubscription);
