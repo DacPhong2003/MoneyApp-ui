@@ -292,8 +292,12 @@ function renderAccountBalance() {
   const thuAll = STATE.transactions.filter(isThu).reduce((s, t) => s + Number(t.so_tien || 0), 0);
   const chiAll = STATE.transactions.filter(isChi).reduce((s, t) => s + Number(t.so_tien || 0), 0);
   const balance = baseline + thuAll - chiAll;
-  $('#ov-account-balance').textContent = fmtMoney(balance);
-  $('#ov-account-balance').style.color = balance < 0 ? 'var(--danger)' : 'var(--text)';
+  ['#ov-account-balance', '#cat-account-balance'].forEach(sel => {
+    const el = $(sel);
+    if (!el) return;
+    el.textContent = fmtMoney(balance);
+    el.style.color = balance < 0 ? 'var(--danger)' : 'var(--text)';
+  });
 }
 
 // ---------- GIAO DICH: dieu huong theo thang HOAC theo tuan ----------
@@ -440,6 +444,7 @@ function renderWalletsSection(monthKey) {
 }
 
 function renderCategoryListPage() {
+  renderAccountBalance();
   const isMonthMode = STATE.catViewMode === 'month';
   if (isMonthMode) {
     const mk = catRelevantMonthKey();
