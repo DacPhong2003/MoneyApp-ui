@@ -104,6 +104,7 @@ function updateTxModeUI() {
   $('#tx-date-range-bar').style.display = isCustom ? 'flex' : 'none';
 }
 function monthLabel(d) { return `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`; }
+function monthLabelFromKey(monthKey) { const [y, m] = monthKey.split('-').map(Number); return `Tháng ${m}/${y}`; }
 function fmtTxTime(raw) {
   const d = parseTxDate(raw);
   if (isNaN(d.getTime())) return '';
@@ -194,6 +195,10 @@ function updateCatModeUI() {
   const isCustom = STATE.catViewMode === 'custom';
   $('#cat-month-nav').style.display = isCustom ? 'none' : 'flex';
   $('#cat-date-range-bar').style.display = isCustom ? 'flex' : 'none';
+}
+function catRelevantMonthKey() {
+  if (STATE.catViewMode === 'month') return monthKeyFromDate(STATE.catPeriodDate);
+  return monthKeyFromDate(new Date());
 }
 
 // ---------- TAB NAVIGATION ----------
@@ -376,6 +381,7 @@ function renderAll() {
 }
 
 function renderCategoryListPage() {
+  renderSubsSummary(catRelevantMonthKey(), '#cat-subs-section', '#cat-subs-card');
   const tx = getCategoryPageTx();
   const totals = {};
   STATE.categories.forEach(c => { totals[c] = 0; });
@@ -442,9 +448,9 @@ function subEffectiveAmount(sub, monthKey) {
   return (ov[monthKey] !== undefined && ov[monthKey] !== null) ? ov[monthKey] : Number(sub.default_amount || sub.amount || 0);
 }
 
-function renderSubsSummary(monthKey) {
-  const section = $('#subs-summary-section');
-  const card = $('#subs-summary-card');
+function renderSubsSummary(monthKey, sectionSel = '#subs-summary-section', cardSel = '#subs-summary-card') {
+  const section = $(sectionSel);
+  const card = $(cardSel);
   if (!STATE.subscriptions || STATE.subscriptions.length === 0) { section.style.display = 'none'; return; }
   section.style.display = 'block';
   monthKey = monthKey || monthKeyFromDate(STATE.ovPeriodDate);
@@ -461,7 +467,7 @@ function renderSubsSummary(monthKey) {
   }).join('') + `<div class="cat-row" style="border-top:1px solid var(--border); margin-top:4px; padding-top:10px;"><strong>Tổng dự kiến</strong><strong>${fmtMoney(total)}</strong></div>
   <div style="font-size:11px; color:var(--muted); margin-top:8px;">Số dự kiến, không tự cộng vào chi tiêu thực tế (khoản thực tế vẫn tính khi giao dịch email thật về).</div>`;
 
-  $$('.sub-effective-amount').forEach(el => {
+  $$(`${cardSel} .sub-effective-amount`).forEach(el => {
     el.addEventListener('click', () => openSubEditModal(el.dataset.id, monthKey));
   });
 }
@@ -472,7 +478,7 @@ function openSubEditModal(subId, monthKey) {
   const modal = $('#sub-edit-modal');
   modal.dataset.subId = subId;
   modal.dataset.monthKey = monthKey;
-  $('#sub-edit-title').textContent = `${sub.name} — ${monthLabel(STATE.ovPeriodDate)}`;
+  $('#sub-edit-title').textContent = `${sub.name} — ${monthLabelFromKey(monthKey)}`;
   $('#sub-edit-amount-input').value = subEffectiveAmount(sub, monthKey);
   openModal(modal);
 }
@@ -501,6 +507,7 @@ async function saveSubEdit() {
     STATE.subscriptions = newData;
     closeModal(modal);
     renderSubsSummary(monthKeyFromDate(STATE.ovPeriodDate));
+    safeRender('category-list-page', () => renderCategoryListPage());
     renderSubsList();
   } catch (e) { alert('Lưu thất bại: ' + e.message); }
   finally { $('#sub-edit-save-btn').disabled = false; }
@@ -840,6 +847,7 @@ async function addSubscription() {
     $('#sub-name-input').value = ''; $('#sub-amount-input').value = '';
     renderSubsList();
     renderSubsSummary(monthKeyFromDate(STATE.ovPeriodDate));
+    safeRender('category-list-page', () => renderCategoryListPage());
   } catch (e) { alert('Thêm thất bại: ' + e.message); }
   finally { $('#add-sub-btn').disabled = false; }
 }
@@ -850,6 +858,7 @@ async function removeSubscription(id) {
     STATE.subscriptions = newData;
     renderSubsList();
     renderSubsSummary(monthKeyFromDate(STATE.ovPeriodDate));
+    safeRender('category-list-page', () => renderCategoryListPage());
   } catch (e) { alert('Xoá thất bại: ' + e.message); }
 }
 $('#add-sub-btn').addEventListener('click', addSubscription);
