@@ -884,6 +884,32 @@ function renderBudgetInputs() {
     row.innerHTML = `<span>${iconFor(cat)} ${cat}</span><input type="number" data-cat="${cat}" placeholder="0" value="${b.by_category?.[cat] || ''}">`;
     wrap.appendChild(row);
   });
+  renderBudgetMonthsList();
+}
+function renderBudgetMonthsList() {
+  const wrap = $('#budget-months-list');
+  const byMonth = STATE.budgets.by_month || {};
+  const months = Object.keys(byMonth).sort((a, b) => b.localeCompare(a));
+  if (months.length === 0) {
+    wrap.innerHTML = '<div class="empty-state" style="padding:8px 0;">Chưa có tháng nào được set riêng.</div>';
+    return;
+  }
+  const currentMonth = $('#budget-month-input').value;
+  wrap.innerHTML = months.map(mk => {
+    const overall = byMonth[mk].overall;
+    return `
+    <div class="sub-item"${mk === currentMonth ? ' style="border-color:var(--accent);"' : ''}>
+      <div><div class="sub-name">${monthLabelFromKey(mk)}</div><div class="sub-meta">${overall ? fmtMoney(overall) : 'Chưa set tổng'}</div></div>
+      <button class="budget-month-edit-btn" data-month="${mk}" style="background:var(--card-2); border:1px solid var(--border); color:var(--text); border-radius:9px; padding:6px 12px; font-size:12px;">Sửa</button>
+    </div>`;
+  }).join('');
+  $$('.budget-month-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $('#budget-month-input').value = btn.dataset.month;
+      renderBudgetInputs();
+      btn.closest('.settings-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
 }
 $('#budget-month-input').addEventListener('change', () => renderBudgetInputs());
 async function saveBudgets() {
@@ -901,6 +927,7 @@ async function saveBudgets() {
     }, `update budgets (${monthKey})`);
     STATE.budgets = newBudgets;
     renderAll();
+    renderBudgetMonthsList();
     alert(`Đã lưu ngân sách cho ${monthLabelFromKey(monthKey)}`);
   } catch (e) { alert('Lưu ngân sách thất bại: ' + e.message); }
   finally { $('#save-budget-btn').disabled = false; }
