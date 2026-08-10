@@ -122,7 +122,7 @@ function fmtDateTime(iso) {
 
 let STATE = {
   transactions: [], categories: [], budgets: { overall_monthly: null, by_category: {} },
-  subscriptions: [], txCustomStart: null, txCustomEnd: null,
+  subscriptions: [], wallets: [], txCustomStart: null, txCustomEnd: null,
   ovViewMode: 'month', ovPeriodDate: new Date(), ovCustomStart: null, ovCustomEnd: null,
   catViewMode: 'month', catPeriodDate: new Date(), catCustomStart: null, catCustomEnd: null,
   filterCategory: '', sort: 'date_desc',
@@ -154,16 +154,18 @@ function txInWeek(t, refDate) {
 }
 
 async function loadAll() {
-  const [tx, cats, budgets, subs] = await Promise.all([
+  const [tx, cats, budgets, subs, wallets] = await Promise.all([
     ghGetFile('data/transactions.json'),
     ghGetFile('data/categories.json'),
     ghGetFile('data/budgets.json').catch(() => ({ data: { overall_monthly: null, by_category: {} }, sha: null })),
-    ghGetFile('data/subscriptions.json').catch(() => ({ data: [], sha: null }))
+    ghGetFile('data/subscriptions.json').catch(() => ({ data: [], sha: null })),
+    ghGetFile('data/wallets.json').catch(() => ({ data: [], sha: null }))
   ]);
   STATE.transactions = tx.data;
   STATE.categories = cats.data;
   STATE.budgets = budgets.data;
   STATE.subscriptions = subs.data;
+  STATE.wallets = wallets.data;
 
   const filterSel = $('#filter-category');
   filterSel.innerHTML = '<option value="">Tất cả danh mục</option>';
@@ -385,11 +387,36 @@ function renderAll() {
   safeRender('category-list-page', () => renderCategoryListPage());
 }
 
+function isWalletPaid(walletId, monthKey) {
+  return STATE.transactions.some(t => t.wallet_id === walletId && t.wallet_month === monthKey);
+}
+
+function renderWalletsSection(monthKey) {
+  const section = $('#cat-wallets-section');
+  const card = $('#cat-wallets-card');
+  const wallets = (STATE.wallets || []).filter(w => w.month === monthKey);
+  if (wallets.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  let total = 0;
+  card.innerHTML = wallets.map(w => {
+    total += Number(w.amount || 0);
+    const paid = isWalletPaid(w.id, monthKey);
+    return `
+    <div class="cat-row">
+      <div class="cat-left"><span>💳 ${w.name}${paid ? ' <span style="color:var(--accent); font-size:11px;">✓ Đã nộp</span>' : ''}</span></div>
+      <div class="cat-amount">${fmtMoney(w.amount)}</div>
+    </div>`;
+  }).join('') + `<div class="cat-row" style="border-top:1px solid var(--border); margin-top:4px; padding-top:10px;"><strong>Tổng</strong><strong>${fmtMoney(total)}</strong></div>`;
+}
+
 function renderCategoryListPage() {
   if (STATE.catViewMode === 'month') {
-    renderSubsSummary(catRelevantMonthKey(), '#cat-subs-section', '#cat-subs-card');
+    const mk = catRelevantMonthKey();
+    renderSubsSummary(mk, '#cat-subs-section', '#cat-subs-card');
+    renderWalletsSection(mk);
   } else {
     $('#cat-subs-section').style.display = 'none';
+    $('#cat-wallets-section').style.display = 'none';
   }
   const tx = getCategoryPageTx();
   const totals = {};
@@ -681,6 +708,25 @@ function openLabelModal(tx) {
   subMonthInput.style.display = showMonth ? 'block' : 'none';
   subMonthInput.value = tx.subscription_month || monthKeyFromDate(parseTxDate(tx.thoi_gian_giao_dich));
 
+  const walletSel = $('#label-wallet-select');
+  walletSel.innerHTML = '<option value="">Không</option>';
+  (STATE.wallets || []).forEach(w => {
+    const opt = document.createElement('option');
+    opt.value = w.id; opt.textContent = w.month ? `💳 ${w.name} (${monthLabelFromKey(w.month)})` : `💳 ${w.name}`;
+    walletSel.appendChild(opt);
+  });
+  walletSel.value = tx.wallet_id || '';
+
+  const walletMonthInput = $('#label-wallet-month');
+  const walletMonthLabel = $('#label-wallet-month-label');
+  const showWalletMonth = !!walletSel.value;
+  walletMonthLabel.style.display = showWalletMonth ? 'block' : 'none';
+  walletMonthInput.style.display = showWalletMonth ? 'block' : 'none';
+  if (showWalletMonth) {
+    const w = STATE.wallets.find(x => x.id === walletSel.value);
+    walletMonthInput.value = tx.wallet_month || (w && w.month) || monthKeyFromDate(parseTxDate(tx.thoi_gian_giao_dich));
+  }
+
   openModal(modal);
 }
 $('#label-subscription-select').addEventListener('change', (e) => {
@@ -691,6 +737,15 @@ $('#label-subscription-select').addEventListener('change', (e) => {
     $('#label-subscription-month').value = monthKeyFromDate(new Date());
   }
 });
+$('#label-wallet-select').addEventListener('change', (e) => {
+  const show = !!e.target.value;
+  $('#label-wallet-month-label').style.display = show ? 'block' : 'none';
+  $('#label-wallet-month').style.display = show ? 'block' : 'none';
+  if (show) {
+    const w = STATE.wallets.find(x => x.id === e.target.value);
+    $('#label-wallet-month').value = (w && w.month) || monthKeyFromDate(new Date());
+  }
+});
 
 async function saveLabel() {
   const modal = $('#label-modal');
@@ -699,13 +754,19 @@ async function saveLabel() {
   const note = $('#label-note').value;
   const subscriptionId = $('#label-subscription-select').value || null;
   const subscriptionMonth = subscriptionId ? ($('#label-subscription-month').value || null) : null;
+  const walletId = $('#label-wallet-select').value || null;
+  const walletMonth = walletId ? ($('#label-wallet-month').value || null) : null;
   if (!cat) { alert('Chọn 1 danh mục'); return; }
   $('#save-label-btn').disabled = true;
   try {
     const newData = await ghUpdateJson('data/transactions.json', (data) => {
       const list = data || [];
       const idx = list.findIndex(t => t.id === txId);
-      if (idx >= 0) { list[idx].category = cat; list[idx].note = note; list[idx].labeled = true; list[idx].subscription_id = subscriptionId; list[idx].subscription_month = subscriptionMonth; }
+      if (idx >= 0) {
+        list[idx].category = cat; list[idx].note = note; list[idx].labeled = true;
+        list[idx].subscription_id = subscriptionId; list[idx].subscription_month = subscriptionMonth;
+        list[idx].wallet_id = walletId; list[idx].wallet_month = walletMonth;
+      }
       return list;
     }, `label: ${txId}`);
     STATE.transactions = newData;
@@ -960,6 +1021,93 @@ async function removeSubscription(id) {
 }
 $('#add-sub-btn').addEventListener('click', addSubscription);
 
+// ---------- VI CO DINH ----------
+function renderWalletsList() {
+  const wrap = $('#wallets-list');
+  wrap.innerHTML = '';
+  if (!STATE.wallets || STATE.wallets.length === 0) {
+    wrap.innerHTML = '<div class="empty-state" style="padding:8px 0;">Chưa có ví cố định nào.</div>';
+    return;
+  }
+  [...STATE.wallets].sort((a, b) => (b.month || '').localeCompare(a.month || '')).forEach(w => {
+    const row = document.createElement('div');
+    row.className = 'sub-item';
+    row.innerHTML = `
+      <div><div class="sub-name">💳 ${w.name}</div><div class="sub-meta">${w.month ? monthLabelFromKey(w.month) : 'Chưa chọn tháng'}</div></div>
+      <div style="display:flex; align-items:center;"><span class="sub-amount">${fmtMoney(w.amount)}</span><button class="wallet-edit-btn" data-id="${w.id}" style="background:none; border:none; color:var(--muted); font-size:16px; padding:0 6px;">✏️</button><button class="sub-remove" data-id="${w.id}">✕</button></div>`;
+    row.querySelector('.sub-remove').addEventListener('click', () => removeWallet(w.id));
+    row.querySelector('.wallet-edit-btn').addEventListener('click', () => openWalletEditModal(w.id));
+    wrap.appendChild(row);
+  });
+}
+
+async function addWallet() {
+  const name = $('#wallet-name-input').value.trim();
+  const amount = parseFloat($('#wallet-amount-input').value);
+  const month = $('#wallet-month-input').value || null;
+  if (!name || !amount) { alert('Nhập đủ tên và số tiền'); return; }
+  $('#add-wallet-btn').disabled = true;
+  try {
+    const newData = await ghUpdateJson('data/wallets.json', (data) => {
+      const list = data || [];
+      list.push({ id: 'wallet_' + Date.now(), name, amount, month });
+      return list;
+    }, `add wallet: ${name}`);
+    STATE.wallets = newData;
+    $('#wallet-name-input').value = ''; $('#wallet-amount-input').value = ''; $('#wallet-month-input').value = '';
+    renderWalletsList();
+    safeRender('category-list-page', () => renderCategoryListPage());
+  } catch (e) { alert('Thêm thất bại: ' + e.message); }
+  finally { $('#add-wallet-btn').disabled = false; }
+}
+$('#add-wallet-btn').addEventListener('click', addWallet);
+
+function openWalletEditModal(walletId) {
+  const w = STATE.wallets.find(x => x.id === walletId);
+  if (!w) return;
+  const modal = $('#wallet-edit-modal');
+  modal.dataset.walletId = walletId;
+  $('#wallet-edit-name-input').value = w.name || '';
+  $('#wallet-edit-amount-input').value = w.amount ?? '';
+  $('#wallet-edit-month-input').value = w.month || '';
+  openModal(modal);
+}
+
+async function saveWalletEdit() {
+  const modal = $('#wallet-edit-modal');
+  const walletId = modal.dataset.walletId;
+  const name = $('#wallet-edit-name-input').value.trim();
+  const amount = parseFloat($('#wallet-edit-amount-input').value);
+  const month = $('#wallet-edit-month-input').value || null;
+  if (!name || !amount) { alert('Nhập đủ tên và số tiền'); return; }
+  $('#wallet-edit-save-btn').disabled = true;
+  try {
+    const newData = await ghUpdateJson('data/wallets.json', (data) => {
+      const list = data || [];
+      const idx = list.findIndex(w => w.id === walletId);
+      if (idx >= 0) { list[idx].name = name; list[idx].amount = amount; list[idx].month = month; }
+      return list;
+    }, `edit wallet: ${walletId}`);
+    STATE.wallets = newData;
+    closeModal(modal);
+    renderWalletsList();
+    safeRender('category-list-page', () => renderCategoryListPage());
+  } catch (e) { alert('Lưu thất bại: ' + e.message); }
+  finally { $('#wallet-edit-save-btn').disabled = false; }
+}
+$('#wallet-edit-save-btn').addEventListener('click', saveWalletEdit);
+$('#wallet-edit-close-btn').addEventListener('click', () => { closeModal($('#wallet-edit-modal')); });
+
+async function removeWallet(id) {
+  if (!confirm('Xoá ví cố định này?')) return;
+  try {
+    const newData = await ghUpdateJson('data/wallets.json', (data) => (data || []).filter(w => w.id !== id), `remove wallet: ${id}`);
+    STATE.wallets = newData;
+    renderWalletsList();
+    safeRender('category-list-page', () => renderCategoryListPage());
+  } catch (e) { alert('Xoá thất bại: ' + e.message); }
+}
+
 // ---------- INIT ----------
 async function init() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
@@ -983,6 +1131,7 @@ async function boot() {
     renderBudgetInputs();
     renderCategoryTags();
     renderSubsList();
+    renderWalletsList();
   } catch (e) {
     alert('Lỗi tải dữ liệu: ' + e.message + '\nKiểm tra lại token trong Cài đặt.');
   }

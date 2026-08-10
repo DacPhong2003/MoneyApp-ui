@@ -288,6 +288,11 @@
     <div class="chart-card" id="cat-subs-card"></div>
     <div style="font-size:11px; color:var(--muted); margin-top:6px;">Bấm vào số tiền để chỉnh riêng cho tháng này (VD: ví trả sau đổi số hàng tháng).</div>
   </section>
+
+  <section id="cat-wallets-section" style="display:none;">
+    <h2>Ví cố định</h2>
+    <div class="chart-card" id="cat-wallets-card"></div>
+  </section>
 </div>
 
 <!-- TRANG CAI DAT -->
@@ -329,6 +334,18 @@
       <input id="sub-due-day-input" type="number" min="1" max="31" placeholder="VD: 5">
       <button id="add-sub-btn" class="btn-primary">Thêm khoản cố định</button>
     </div>
+
+    <div class="settings-card">
+      <h3>Ví cố định</h3>
+      <div id="wallets-list" style="margin-bottom:12px;"></div>
+      <div class="field-label">Tên</div>
+      <input id="wallet-name-input" placeholder="VD: Fundiin, Kredivo...">
+      <div class="field-label">Số tiền</div>
+      <input id="wallet-amount-input" type="number" placeholder="VD: 500000">
+      <div class="field-label">Tháng / năm</div>
+      <input id="wallet-month-input" type="month">
+      <button id="add-wallet-btn" class="btn-primary">Thêm ví cố định</button>
+    </div>
   </section>
 </div>
 
@@ -359,6 +376,10 @@
     <select id="label-subscription-select"><option value="">Không</option></select>
     <div class="field-label" id="label-sub-month-label" style="display:none;">Cho tháng nào</div>
     <input type="month" id="label-subscription-month" style="display:none;">
+    <div class="field-label">Ví cố định</div>
+    <select id="label-wallet-select"><option value="">Không</option></select>
+    <div class="field-label" id="label-wallet-month-label" style="display:none;">Cho tháng nào</div>
+    <input type="month" id="label-wallet-month" style="display:none;">
     <textarea id="label-note" placeholder="Ghi chú: mục đích, từ đâu..." rows="2"></textarea>
     <button id="save-label-btn" class="btn-primary">Lưu</button>
     <button id="delete-tx-btn" class="btn-danger">Xoá giao dịch này</button>
@@ -389,6 +410,20 @@
     <input id="sub-full-edit-due-day-input" type="number" min="1" max="31" placeholder="VD: 5">
     <button id="sub-full-edit-save-btn" class="btn-primary">Lưu</button>
     <button id="sub-full-edit-close-btn" class="btn-secondary">Đóng</button>
+  </div>
+</div>
+
+<div class="modal" id="wallet-edit-modal">
+  <div class="modal-box">
+    <h3>Sửa ví cố định</h3>
+    <div class="field-label">Tên</div>
+    <input id="wallet-edit-name-input" placeholder="VD: Fundiin, Kredivo...">
+    <div class="field-label">Số tiền</div>
+    <input id="wallet-edit-amount-input" type="number" placeholder="VD: 500000">
+    <div class="field-label">Tháng / năm</div>
+    <input id="wallet-edit-month-input" type="month">
+    <button id="wallet-edit-save-btn" class="btn-primary">Lưu</button>
+    <button id="wallet-edit-close-btn" class="btn-secondary">Đóng</button>
   </div>
 </div>
 
