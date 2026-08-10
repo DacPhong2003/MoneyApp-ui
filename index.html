@@ -305,7 +305,10 @@
     </div>
 
     <div class="settings-card">
-      <h3>Ngân sách tháng (tổng)</h3>
+      <h3>Ngân sách theo tháng</h3>
+      <div class="field-label">Chọn tháng</div>
+      <input type="month" id="budget-month-input">
+      <div class="field-label" style="margin-top:10px;">Ngân sách tổng</div>
       <input id="budget-overall-input" type="number" placeholder="VD: 5000000">
       <h3 style="margin-top:14px;">Ngân sách theo danh mục</h3>
       <div id="budget-by-category"></div>
@@ -352,7 +355,7 @@
 <div class="tabbar">
   <button class="tab-btn active" data-page="page-overview"><span class="tab-icon">📊</span>Tổng quan</button>
   <button class="tab-btn" data-page="page-transactions"><span class="tab-icon">📋</span>Giao dịch</button>
-  <button class="tab-btn" data-page="page-categories"><span class="tab-icon">🏷️</span>Phân loại</button>
+  <button class="tab-btn" data-page="page-categories"><span class="tab-icon">📈</span>Thống kê</button>
   <button class="tab-btn" data-page="page-settings"><span class="tab-icon">⚙️</span>Cài đặt</button>
 </div>
 

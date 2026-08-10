@@ -110,6 +110,15 @@ function updateTxModeUI() {
 }
 function monthLabel(d) { return `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`; }
 function monthLabelFromKey(monthKey) { const [y, m] = monthKey.split('-').map(Number); return `Tháng ${m}/${y}`; }
+function getBudgetForMonth(monthKey) {
+  const perMonth = (STATE.budgets.by_month || {})[monthKey];
+  const overall = (perMonth && perMonth.overall !== undefined && perMonth.overall !== null) ? perMonth.overall : STATE.budgets.overall_monthly;
+  const byCategory = { ...(STATE.budgets.by_category || {}), ...((perMonth && perMonth.by_category) || {}) };
+  return { overall, by_category: byCategory };
+}
+function getCategoryBudget(cat, monthKey) {
+  return getBudgetForMonth(monthKey).by_category[cat];
+}
 function fmtTxTime(raw) {
   const d = parseTxDate(raw);
   if (isNaN(d.getTime())) return '';
@@ -401,10 +410,14 @@ function renderWalletsSection(monthKey) {
   card.innerHTML = wallets.map(w => {
     total += Number(w.amount || 0);
     const paid = isWalletPaid(w.id, monthKey);
+    const statusIcon = paid ? '<span style="color:var(--accent); font-weight:800;">✓</span>' : '<span style="color:var(--danger); font-weight:800;">✗</span>';
     return `
     <div class="cat-row">
-      <div class="cat-left"><span>💳 ${w.name}${paid ? ' <span style="color:var(--accent); font-size:11px;">✓ Đã nộp</span>' : ''}</span></div>
-      <div class="cat-amount">${fmtMoney(w.amount)}</div>
+      <div class="cat-left"><span>💳 ${w.name}</span></div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="cat-amount">${fmtMoney(w.amount)}</span>
+        <span style="width:16px; text-align:center;">${statusIcon}</span>
+      </div>
     </div>`;
   }).join('') + `<div class="cat-row" style="border-top:1px solid var(--border); margin-top:4px; padding-top:10px;"><strong>Tổng</strong><strong>${fmtMoney(total)}</strong></div>`;
 }
@@ -431,15 +444,40 @@ function renderCategoryListPage() {
   const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
 
   const card = $('#cat-list-card');
+  const isMonthMode = STATE.catViewMode === 'month';
+  const mkForBudget = isMonthMode ? catRelevantMonthKey() : null;
   let html = '';
+  if (isMonthMode) {
+    html += `
+    <div class="cat-row cat-row-head" style="font-size:10.5px; color:var(--muted); font-weight:700;">
+      <div class="cat-left">Danh mục</div>
+      <div style="text-align:right; min-width:140px;">Đã chi / Ngân sách / %</div>
+    </div>`;
+  }
   if (entries.every(([, amt]) => amt === 0) && uncategorized === 0) {
-    html = '<div class="empty-state">Chưa có giao dịch trong khoảng thời gian này</div>';
+    html += '<div class="empty-state">Chưa có giao dịch trong khoảng thời gian này</div>';
   } else {
     entries.forEach(([cat, amt]) => {
+      let statsLine = '';
+      if (isMonthMode) {
+        const budget = getCategoryBudget(cat, mkForBudget);
+        if (budget && budget > 0) {
+          const pct = Math.round((amt / budget) * 100);
+          let pctColor = 'var(--accent)';
+          if (pct > 100) pctColor = 'var(--danger)';
+          else if (pct >= 80) pctColor = 'var(--warn)';
+          statsLine = `<div style="font-size:11px; color:var(--muted); margin-top:2px;">NS: ${fmtMoney(budget)} · <span style="color:${pctColor}; font-weight:700;">${pct}%</span></div>`;
+        } else {
+          statsLine = `<div style="font-size:11px; color:var(--muted); margin-top:2px;">NS: —</div>`;
+        }
+      }
       html += `
       <div class="cat-row">
         <div class="cat-left"><span>${iconFor(cat)} ${cat}</span></div>
-        <div class="cat-amount">${fmtMoney(amt)}</div>
+        <div style="text-align:right;">
+          <div class="cat-amount">${fmtMoney(amt)}</div>
+          ${statsLine}
+        </div>
       </div>`;
     });
     if (uncategorized > 0) {
@@ -461,7 +499,7 @@ function renderSummary(tx) {
 
   if (STATE.ovViewMode !== 'month') return;
 
-  const budget = STATE.budgets.overall_monthly;
+  const budget = getBudgetForMonth(monthKeyFromDate(STATE.ovPeriodDate)).overall;
   const wrap = $('#budget-bar-wrap');
   const fill = $('#budget-bar-fill');
   const text = $('#budget-text');
@@ -500,10 +538,14 @@ function renderSubsSummary(monthKey, sectionSel = '#subs-summary-section', cardS
     total += amt;
     const isOverridden = s.overrides && s.overrides[monthKey] !== undefined;
     const paid = isSubPaidInMonth(s.id, monthKey);
+    const statusIcon = paid ? '<span style="color:var(--accent); font-weight:800;">✓</span>' : '<span style="color:var(--danger); font-weight:800;">✗</span>';
     return `
     <div class="cat-row">
-      <div class="cat-left"><span>${iconFor(s.category)} ${s.name}${isOverridden ? ' <span style="color:var(--accent-2); font-size:10px;">(đã sửa)</span>' : ''}${paid ? ' <span style="color:var(--accent); font-size:11px;">✓ Đã nộp</span>' : ''}</span></div>
-      <div class="cat-amount sub-effective-amount" data-id="${s.id}" style="cursor:pointer; text-decoration:underline dotted;">${fmtMoney(amt)}</div>
+      <div class="cat-left"><span>${iconFor(s.category)} ${s.name}${isOverridden ? ' <span style="color:var(--accent-2); font-size:10px;">(đã sửa)</span>' : ''}</span></div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="cat-amount sub-effective-amount" data-id="${s.id}" style="cursor:pointer; text-decoration:underline dotted;">${fmtMoney(amt)}</span>
+        <span style="width:16px; text-align:center;">${statusIcon}</span>
+      </div>
     </div>`;
   }).join('') + `<div class="cat-row" style="border-top:1px solid var(--border); margin-top:4px; padding-top:10px;"><strong>Tổng dự kiến</strong><strong>${fmtMoney(total)}</strong></div>
   <div style="font-size:11px; color:var(--muted); margin-top:8px;">Số dự kiến, không tự cộng vào chi tiêu thực tế (khoản thực tế vẫn tính khi giao dịch email thật về).</div>`;
@@ -588,7 +630,7 @@ function renderCategoryChart(tx) {
   entries.forEach(([cat, amt], i) => {
     const row = document.createElement('div');
     row.className = 'cat-row';
-    const catBudget = STATE.budgets.by_category?.[cat];
+    const catBudget = STATE.ovViewMode === 'month' ? getCategoryBudget(cat, monthKeyFromDate(STATE.ovPeriodDate)) : null;
     const budgetMini = catBudget ? `<div class="cat-budget-mini">${fmtMoney(amt)} / ${fmtMoney(catBudget)}${amt > catBudget ? ' ⚠️' : ''}</div>` : '';
     row.innerHTML = `
       <div class="cat-left"><span class="cat-dot" style="background:${CHART_COLORS[i % CHART_COLORS.length]}"></span><span>${iconFor(cat)} ${cat}</span></div>
@@ -826,27 +868,37 @@ $('#settings-save-token-btn').addEventListener('click', () => {
 
 // ---------- SETTINGS: BUDGET ----------
 function renderBudgetInputs() {
-  $('#budget-overall-input').value = STATE.budgets.overall_monthly || '';
+  const monthInput = $('#budget-month-input');
+  if (!monthInput.value) monthInput.value = monthKeyFromDate(new Date());
+  const monthKey = monthInput.value;
+  const b = getBudgetForMonth(monthKey);
+  $('#budget-overall-input').value = b.overall || '';
   const wrap = $('#budget-by-category');
   wrap.innerHTML = '';
   STATE.categories.filter(c => c !== 'Thu nhập').forEach(cat => {
     const row = document.createElement('div');
     row.className = 'budget-row';
-    row.innerHTML = `<span>${iconFor(cat)} ${cat}</span><input type="number" data-cat="${cat}" placeholder="0" value="${STATE.budgets.by_category?.[cat] || ''}">`;
+    row.innerHTML = `<span>${iconFor(cat)} ${cat}</span><input type="number" data-cat="${cat}" placeholder="0" value="${b.by_category?.[cat] || ''}">`;
     wrap.appendChild(row);
   });
 }
+$('#budget-month-input').addEventListener('change', () => renderBudgetInputs());
 async function saveBudgets() {
+  const monthKey = $('#budget-month-input').value || monthKeyFromDate(new Date());
   const overall = parseFloat($('#budget-overall-input').value) || null;
   const byCat = {};
   $$('#budget-by-category input').forEach(inp => { const v = parseFloat(inp.value); if (v > 0) byCat[inp.dataset.cat] = v; });
-  const newBudgets = { overall_monthly: overall, by_category: byCat };
   $('#save-budget-btn').disabled = true;
   try {
-    await ghUpdateJson('data/budgets.json', () => newBudgets, 'update budgets');
+    const newBudgets = await ghUpdateJson('data/budgets.json', (data) => {
+      const b = data || { overall_monthly: null, by_category: {}, by_month: {} };
+      if (!b.by_month) b.by_month = {};
+      b.by_month[monthKey] = { overall, by_category: byCat };
+      return b;
+    }, `update budgets (${monthKey})`);
     STATE.budgets = newBudgets;
     renderAll();
-    alert('Đã lưu ngân sách');
+    alert(`Đã lưu ngân sách cho ${monthLabelFromKey(monthKey)}`);
   } catch (e) { alert('Lưu ngân sách thất bại: ' + e.message); }
   finally { $('#save-budget-btn').disabled = false; }
 }
