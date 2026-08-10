@@ -55,6 +55,11 @@ function parseTxDate(iso) {
 }
 function monthKeyFromDate(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 function monthLabel(d) { return `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`; }
+function fmtTxTime(raw) {
+  const d = parseTxDate(raw);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
 function fmtDateTime(iso) {
   const d = new Date(iso);
   return d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -317,6 +322,7 @@ function renderTxList(monthKey) {
         <div class="tx-main">
           <div class="tx-partner">${t.doi_tac || 'Không rõ'}</div>
           <div class="tx-note">${t.note || t.noi_dung || ''}</div>
+          <div class="tx-time">${fmtTxTime(t.thoi_gian_giao_dich)}</div>
         </div>
       </div>
       <div class="tx-side">
@@ -366,6 +372,7 @@ function openLabelModal(tx) {
   $('#label-note').value = tx.note || '';
   $('#label-amount').textContent = fmtMoney(tx.so_tien);
   $('#label-partner').textContent = tx.doi_tac || '';
+  $('#label-time').textContent = fmtTxTime(tx.thoi_gian_giao_dich);
   modal.dataset.txId = tx.id;
   modal.style.display = 'flex';
 }
