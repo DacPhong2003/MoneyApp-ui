@@ -127,7 +127,7 @@ function renderAll() {
   }
 
   renderSummary(monthKey);
-  renderSubsSummary();
+  renderSubsSummary(monthKey);
   renderCategoryChart(monthKey);
   renderTrendChart();
   renderTxList(monthKey);
@@ -157,20 +157,74 @@ function renderSummary(monthKey) {
   }
 }
 
-function renderSubsSummary() {
+function subEffectiveAmount(sub, monthKey) {
+  const ov = sub.overrides || {};
+  return (ov[monthKey] !== undefined && ov[monthKey] !== null) ? ov[monthKey] : Number(sub.default_amount || sub.amount || 0);
+}
+
+function renderSubsSummary(monthKey) {
   const section = $('#subs-summary-section');
   const card = $('#subs-summary-card');
   if (!STATE.subscriptions || STATE.subscriptions.length === 0) { section.style.display = 'none'; return; }
   section.style.display = 'block';
-  const total = STATE.subscriptions.reduce((s, x) => s + Number(x.amount || 0), 0);
-  card.innerHTML = STATE.subscriptions.map(s => `
+  monthKey = monthKey || monthKeyFromDate(STATE.currentMonthDate);
+  let total = 0;
+  card.innerHTML = STATE.subscriptions.map(s => {
+    const amt = subEffectiveAmount(s, monthKey);
+    total += amt;
+    const isOverridden = s.overrides && s.overrides[monthKey] !== undefined;
+    return `
     <div class="cat-row">
-      <div class="cat-left"><span>${iconFor(s.category)} ${s.name}</span></div>
-      <div class="cat-amount">${fmtMoney(s.amount)}</div>
-    </div>
-  `).join('') + `<div class="cat-row" style="border-top:1px solid var(--border); margin-top:4px; padding-top:10px;"><strong>Tổng cố định</strong><strong>${fmtMoney(total)}</strong></div>
-  <div style="font-size:11px; color:var(--muted); margin-top:8px;">Đây là danh sách tham khảo, không tự cộng vào chi tiêu thực tế (khoản thực tế vẫn tính khi giao dịch email thật về).</div>`;
+      <div class="cat-left"><span>${iconFor(s.category)} ${s.name}${isOverridden ? ' <span style="color:var(--accent-2); font-size:10px;">(đã sửa)</span>' : ''}</span></div>
+      <div class="cat-amount sub-effective-amount" data-id="${s.id}" style="cursor:pointer; text-decoration:underline dotted;">${fmtMoney(amt)}</div>
+    </div>`;
+  }).join('') + `<div class="cat-row" style="border-top:1px solid var(--border); margin-top:4px; padding-top:10px;"><strong>Tổng dự kiến</strong><strong>${fmtMoney(total)}</strong></div>
+  <div style="font-size:11px; color:var(--muted); margin-top:8px;">Số dự kiến, không tự cộng vào chi tiêu thực tế (khoản thực tế vẫn tính khi giao dịch email thật về).</div>`;
+
+  $$('.sub-effective-amount').forEach(el => {
+    el.addEventListener('click', () => openSubEditModal(el.dataset.id, monthKey));
+  });
 }
+
+function openSubEditModal(subId, monthKey) {
+  const sub = STATE.subscriptions.find(s => s.id === subId);
+  if (!sub) return;
+  const modal = $('#sub-edit-modal');
+  modal.dataset.subId = subId;
+  modal.dataset.monthKey = monthKey;
+  $('#sub-edit-title').textContent = `${sub.name} — ${monthLabel(STATE.currentMonthDate)}`;
+  $('#sub-edit-amount-input').value = subEffectiveAmount(sub, monthKey);
+  modal.style.display = 'flex';
+}
+
+async function saveSubEdit() {
+  const modal = $('#sub-edit-modal');
+  const subId = modal.dataset.subId;
+  const monthKey = modal.dataset.monthKey;
+  const amount = parseFloat($('#sub-edit-amount-input').value);
+  if (!amount || amount <= 0) { alert('Nhập số tiền hợp lệ'); return; }
+  $('#sub-edit-save-btn').disabled = true;
+  try {
+    const fresh = await ghGetFile('data/subscriptions.json');
+    const idx = fresh.data.findIndex(s => s.id === subId);
+    if (idx >= 0) {
+      if (monthKey === '__default__') {
+        fresh.data[idx].default_amount = amount;
+      } else {
+        if (!fresh.data[idx].overrides) fresh.data[idx].overrides = {};
+        fresh.data[idx].overrides[monthKey] = amount;
+      }
+    }
+    await ghPutFile('data/subscriptions.json', fresh.data, fresh.sha, `update subscription ${subId} (${monthKey})`);
+    STATE.subscriptions = fresh.data;
+    modal.style.display = 'none';
+    renderSubsSummary(monthKeyFromDate(STATE.currentMonthDate));
+    renderSubsList();
+  } catch (e) { alert('Lưu thất bại: ' + e.message); }
+  finally { $('#sub-edit-save-btn').disabled = false; }
+}
+$('#sub-edit-save-btn').addEventListener('click', saveSubEdit);
+$('#sub-edit-close-btn').addEventListener('click', () => { $('#sub-edit-modal').style.display = 'none'; });
 
 function renderCategoryChart(monthKey) {
   const monthTx = STATE.transactions.filter(t => txInMonth(t, monthKey));
@@ -467,11 +521,23 @@ function renderSubsList() {
     const row = document.createElement('div');
     row.className = 'sub-item';
     row.innerHTML = `
-      <div><div class="sub-name">${iconFor(s.category)} ${s.name}</div><div class="sub-meta">${s.category}</div></div>
-      <div style="display:flex; align-items:center;"><span class="sub-amount">${fmtMoney(s.amount)}</span><button class="sub-remove" data-id="${s.id}">✕</button></div>`;
+      <div><div class="sub-name">${iconFor(s.category)} ${s.name}</div><div class="sub-meta">${s.category} · mặc định</div></div>
+      <div style="display:flex; align-items:center;"><span class="sub-amount sub-default-amount" data-id="${s.id}" style="cursor:pointer; text-decoration:underline dotted;">${fmtMoney(s.default_amount ?? s.amount)}</span><button class="sub-remove" data-id="${s.id}">✕</button></div>`;
     row.querySelector('.sub-remove').addEventListener('click', () => removeSubscription(s.id));
+    row.querySelector('.sub-default-amount').addEventListener('click', () => openSubDefaultEditModal(s.id));
     wrap.appendChild(row);
   });
+}
+
+function openSubDefaultEditModal(subId) {
+  const sub = STATE.subscriptions.find(s => s.id === subId);
+  if (!sub) return;
+  const modal = $('#sub-edit-modal');
+  modal.dataset.subId = subId;
+  modal.dataset.monthKey = '__default__';
+  $('#sub-edit-title').textContent = `${sub.name} — số tiền mặc định`;
+  $('#sub-edit-amount-input').value = sub.default_amount ?? sub.amount ?? '';
+  modal.style.display = 'flex';
 }
 async function addSubscription() {
   const name = $('#sub-name-input').value.trim();
@@ -481,12 +547,12 @@ async function addSubscription() {
   $('#add-sub-btn').disabled = true;
   try {
     const fresh = await ghGetFile('data/subscriptions.json').catch(() => ({ data: [], sha: null }));
-    fresh.data.push({ id: 'sub_' + Date.now(), name, amount, category });
+    fresh.data.push({ id: 'sub_' + Date.now(), name, default_amount: amount, category, overrides: {} });
     await ghPutFile('data/subscriptions.json', fresh.data, fresh.sha, `add subscription: ${name}`);
     STATE.subscriptions = fresh.data;
     $('#sub-name-input').value = ''; $('#sub-amount-input').value = '';
     renderSubsList();
-    renderSubsSummary();
+    renderSubsSummary(monthKeyFromDate(STATE.currentMonthDate));
   } catch (e) { alert('Thêm thất bại: ' + e.message); }
   finally { $('#add-sub-btn').disabled = false; }
 }

@@ -162,8 +162,9 @@
   </div>
 
   <section id="subs-summary-section" style="display:none;">
-    <h2>Chi phí cố định hàng tháng</h2>
+    <h2>Dự kiến chi cố định tháng này</h2>
     <div class="chart-card" id="subs-summary-card"></div>
+    <div style="font-size:11px; color:var(--muted); margin-top:6px;">Bấm vào số tiền để chỉnh riêng cho tháng này (VD: ví trả sau đổi số hàng tháng).</div>
   </section>
 
   <section>
@@ -242,8 +243,8 @@
       <div id="subs-list" style="margin-bottom:12px;"></div>
       <div class="field-label">Tên</div>
       <input id="sub-name-input" placeholder="VD: Netflix, tiền nhà, gym...">
-      <div class="field-label">Số tiền / tháng</div>
-      <input id="sub-amount-input" type="number" placeholder="VD: 260000">
+      <div class="field-label">Số tiền mặc định / tháng</div>
+      <input id="sub-amount-input" type="number" placeholder="VD: 260000 (có thể chỉnh riêng từng tháng sau)">
       <div class="field-label">Danh mục</div>
       <select id="sub-category-input"></select>
       <button id="add-sub-btn" class="btn-primary">Thêm khoản cố định</button>
@@ -277,6 +278,16 @@
     <button id="save-label-btn" class="btn-primary">Lưu</button>
     <button id="delete-tx-btn" class="btn-danger">Xoá giao dịch này</button>
     <button id="close-label-btn" class="btn-secondary">Đóng</button>
+  </div>
+</div>
+
+
+<div class="modal" id="sub-edit-modal">
+  <div class="modal-box">
+    <h3 id="sub-edit-title">Chỉnh số tiền</h3>
+    <input id="sub-edit-amount-input" type="number" placeholder="Số tiền">
+    <button id="sub-edit-save-btn" class="btn-primary">Lưu</button>
+    <button id="sub-edit-close-btn" class="btn-secondary">Đóng</button>
   </div>
 </div>
 
