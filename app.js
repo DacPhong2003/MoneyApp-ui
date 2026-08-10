@@ -473,20 +473,21 @@ function renderCategoryListPage() {
     const walletsPaidTotal = walletsThisMonth.reduce((s, w) => s + (isWalletPaid(w.id, mk) ? Number(w.amount || 0) : 0), 0);
     const walletsAllTotal = walletsThisMonth.reduce((s, w) => s + Number(w.amount || 0), 0);
 
-    const tongChi = categorySpentTotal + subsPaidTotal + walletsPaidTotal;
-    const tongNganSach = categoryBudgetTotal + subsAllTotal + walletsAllTotal;
-    const conLai = tongNganSach - tongChi;
-    const daTieuPct = tongNganSach > 0 ? Math.round((tongChi / tongNganSach) * 100) : 0;
+    // Hang 1: chi rieng theo danh muc (khong tinh phi co dinh / khong co dinh)
+    const conLaiDanhMuc = categoryBudgetTotal - categorySpentTotal;
+    $('#stat-tong-chitieu').textContent = fmtMoney(categorySpentTotal);
+    $('#stat-tong-ns-danhmuc').textContent = fmtMoney(categoryBudgetTotal);
+    $('#stat-conlai-danhmuc').textContent = fmtMoney(conLaiDanhMuc);
+    $('#stat-conlai-danhmuc').style.color = conLaiDanhMuc < 0 ? 'var(--danger)' : 'var(--accent)';
 
-    $('#stat-tong-chi').textContent = fmtMoney(tongChi);
-    $('#stat-tong-ns').textContent = fmtMoney(tongNganSach);
-    $('#stat-con-lai').textContent = fmtMoney(conLai);
-    $('#stat-con-lai').style.color = conLai < 0 ? 'var(--danger)' : 'var(--accent)';
-    $('#stat-da-tieu-pct').textContent = daTieuPct + '%';
-    $('#stat-da-tieu-pct').style.color = daTieuPct > 100 ? 'var(--danger)' : (daTieuPct >= 80 ? 'var(--warn)' : 'var(--accent)');
-
-    $('#stat-chiphi-total').textContent = fmtMoney(subsAllTotal + walletsAllTotal);
-    $('#stat-chiphi-paid').textContent = fmtMoney(subsPaidTotal + walletsPaidTotal);
+    // Hang 2: rieng phi co dinh + khong co dinh (da tra / phai tra)
+    const tongDaTra = subsPaidTotal + walletsPaidTotal;
+    const tongPhaiTra = subsAllTotal + walletsAllTotal;
+    const conPhaiTra = tongPhaiTra - tongDaTra;
+    $('#stat-tong-da-tra').textContent = fmtMoney(tongDaTra);
+    $('#stat-tong-phai-tra').textContent = fmtMoney(tongPhaiTra);
+    $('#stat-con-phai-tra').textContent = fmtMoney(conPhaiTra);
+    $('#stat-con-phai-tra').style.color = conPhaiTra > 0 ? 'var(--warn)' : 'var(--accent)';
   } else {
     statGrid.style.display = 'none';
   }

@@ -53,7 +53,9 @@
   .tx-summary-value { font-size: 18px; font-weight: 700; }
   .tx-summary-card.chi .tx-summary-value { color: var(--danger); }
   .tx-summary-card.thu .tx-summary-value { color: var(--accent); }
-  .stat-cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 16px 14px; }
+  .stat-cards-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 0 16px 14px; }
+  .stat-cards-grid .tx-summary-label { font-size: 10px; }
+  .stat-cards-grid .tx-summary-value { font-size: 14.5px; }
   .month-nav button { background: var(--card-2); border: 1px solid var(--border); color: var(--text); width: 34px; height: 34px; border-radius: 9px; font-size: 15px; }
   .month-nav .month-label { font-size: 15px; font-weight: 700; }
 
@@ -290,28 +292,28 @@
 
   <div class="stat-cards-grid" id="cat-stat-cards" style="display:none;">
     <div class="tx-summary-card chi">
-      <div class="tx-summary-label">Tổng chi</div>
-      <div class="tx-summary-value" id="stat-tong-chi">0đ</div>
+      <div class="tx-summary-label">Tổng chi tiêu</div>
+      <div class="tx-summary-value" id="stat-tong-chitieu">0đ</div>
     </div>
     <div class="tx-summary-card">
       <div class="tx-summary-label">Tổng ngân sách</div>
-      <div class="tx-summary-value" id="stat-tong-ns">0đ</div>
+      <div class="tx-summary-value" id="stat-tong-ns-danhmuc">0đ</div>
     </div>
     <div class="tx-summary-card thu">
       <div class="tx-summary-label">Còn lại</div>
-      <div class="tx-summary-value" id="stat-con-lai">0đ</div>
+      <div class="tx-summary-value" id="stat-conlai-danhmuc">0đ</div>
+    </div>
+    <div class="tx-summary-card chi">
+      <div class="tx-summary-label">Tổng chi phí đã trả</div>
+      <div class="tx-summary-value" id="stat-tong-da-tra">0đ</div>
     </div>
     <div class="tx-summary-card">
-      <div class="tx-summary-label">Đã tiêu</div>
-      <div class="tx-summary-value" id="stat-da-tieu-pct">0%</div>
-    </div>
-    <div class="tx-summary-card">
-      <div class="tx-summary-label">Chi phí (cố định + không cố định)</div>
-      <div class="tx-summary-value" id="stat-chiphi-total">0đ</div>
+      <div class="tx-summary-label">Tổng phải trả</div>
+      <div class="tx-summary-value" id="stat-tong-phai-tra">0đ</div>
     </div>
     <div class="tx-summary-card thu">
-      <div class="tx-summary-label">Đã đóng</div>
-      <div class="tx-summary-value" id="stat-chiphi-paid">0đ</div>
+      <div class="tx-summary-label">Còn phải trả</div>
+      <div class="tx-summary-value" id="stat-con-phai-tra">0đ</div>
     </div>
   </div>
 
