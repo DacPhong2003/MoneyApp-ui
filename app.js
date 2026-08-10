@@ -13,6 +13,22 @@ const CHART_COLORS = ['#6dd5a4', '#5b8cff', '#ffb454', '#ff6b6b', '#c792ea', '#4
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
+let _savedScrollY = 0;
+function lockBodyScroll() {
+  _savedScrollY = window.scrollY || window.pageYOffset || 0;
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${_savedScrollY}px`;
+  document.body.style.width = '100%';
+}
+function unlockBodyScroll() {
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.width = '';
+  window.scrollTo(0, _savedScrollY);
+}
+function openModal(el) { lockBodyScroll(); el.style.display = 'flex'; }
+function closeModal(el) { el.style.display = 'none'; unlockBodyScroll(); }
+
 function b64EncodeUnicode(str) {
   return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (m, p1) => String.fromCharCode('0x' + p1)));
 }
@@ -258,7 +274,7 @@ function openSubEditModal(subId, monthKey) {
   modal.dataset.monthKey = monthKey;
   $('#sub-edit-title').textContent = `${sub.name} — ${monthLabel(STATE.currentMonthDate)}`;
   $('#sub-edit-amount-input').value = subEffectiveAmount(sub, monthKey);
-  modal.style.display = 'flex';
+  openModal(modal);
 }
 
 async function saveSubEdit() {
@@ -281,14 +297,14 @@ async function saveSubEdit() {
     }
     await ghPutFile('data/subscriptions.json', fresh.data, fresh.sha, `update subscription ${subId} (${monthKey})`);
     STATE.subscriptions = fresh.data;
-    modal.style.display = 'none';
+    closeModal(modal);
     renderSubsSummary(monthKeyFromDate(STATE.currentMonthDate));
     renderSubsList();
   } catch (e) { alert('Lưu thất bại: ' + e.message); }
   finally { $('#sub-edit-save-btn').disabled = false; }
 }
 $('#sub-edit-save-btn').addEventListener('click', saveSubEdit);
-$('#sub-edit-close-btn').addEventListener('click', () => { $('#sub-edit-modal').style.display = 'none'; });
+$('#sub-edit-close-btn').addEventListener('click', () => { closeModal($('#sub-edit-modal')); });
 
 function renderCategoryChart(monthKey) {
   const monthTx = STATE.transactions.filter(t => txInMonth(t, monthKey));
@@ -432,7 +448,7 @@ function openLabelModal(tx) {
   $('#label-partner').textContent = tx.doi_tac || '';
   $('#label-time').textContent = fmtTxTime(tx.thoi_gian_giao_dich);
   modal.dataset.txId = tx.id;
-  modal.style.display = 'flex';
+  openModal(modal);
 }
 
 async function saveLabel() {
@@ -448,7 +464,7 @@ async function saveLabel() {
     if (idx >= 0) { fresh.data[idx].category = cat; fresh.data[idx].note = note; fresh.data[idx].labeled = true; }
     await ghPutFile('data/transactions.json', fresh.data, fresh.sha, `label: ${txId}`);
     STATE.transactions = fresh.data;
-    modal.style.display = 'none';
+    closeModal(modal);
     renderAll();
   } catch (e) { alert('Lưu thất bại: ' + e.message); }
   finally { $('#save-label-btn').disabled = false; }
@@ -464,7 +480,7 @@ async function deleteTx() {
     const newList = fresh.data.filter(t => t.id !== txId);
     await ghPutFile('data/transactions.json', newList, fresh.sha, `delete: ${txId}`);
     STATE.transactions = newList;
-    modal.style.display = 'none';
+    closeModal(modal);
     renderAll();
   } catch (e) { alert('Xoá thất bại: ' + e.message); }
   finally { $('#delete-tx-btn').disabled = false; }
@@ -612,7 +628,7 @@ function openSubDefaultEditModal(subId) {
   modal.dataset.monthKey = '__default__';
   $('#sub-edit-title').textContent = `${sub.name} — số tiền mặc định`;
   $('#sub-edit-amount-input').value = sub.default_amount ?? sub.amount ?? '';
-  modal.style.display = 'flex';
+  openModal(modal);
 }
 async function addSubscription() {
   const name = $('#sub-name-input').value.trim();
@@ -648,12 +664,12 @@ $('#add-sub-btn').addEventListener('click', addSubscription);
 async function init() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
   if (!getToken()) {
-    $('#token-modal').style.display = 'flex';
+    openModal($('#token-modal'));
     $('#save-token-btn').addEventListener('click', () => {
       const t = $('#token-input').value.trim();
       if (!t) return;
       setToken(t);
-      $('#token-modal').style.display = 'none';
+      closeModal($('#token-modal'));
       boot();
     });
     return;
@@ -674,7 +690,7 @@ async function boot() {
 
 $('#save-label-btn').addEventListener('click', saveLabel);
 $('#delete-tx-btn').addEventListener('click', deleteTx);
-$('#close-label-btn').addEventListener('click', () => { $('#label-modal').style.display = 'none'; });
+$('#close-label-btn').addEventListener('click', () => { closeModal($('#label-modal')); });
 $('#enable-push-btn').addEventListener('click', enablePush);
 $('#refresh-btn').addEventListener('click', boot);
 $('#filter-category').addEventListener('change', (e) => { STATE.filterCategory = e.target.value; renderTxList(); });
