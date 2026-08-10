@@ -654,6 +654,16 @@ function openLabelModal(tx) {
   $('#label-partner').textContent = tx.doi_tac || '';
   $('#label-time').textContent = fmtTxTime(tx.thoi_gian_giao_dich);
   modal.dataset.txId = tx.id;
+
+  const subSel = $('#label-subscription-select');
+  subSel.innerHTML = '<option value="">Không</option>';
+  (STATE.subscriptions || []).forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id; opt.textContent = `${iconFor(s.category)} ${s.name}`;
+    subSel.appendChild(opt);
+  });
+  subSel.value = tx.subscription_id || '';
+
   openModal(modal);
 }
 
@@ -662,13 +672,14 @@ async function saveLabel() {
   const txId = modal.dataset.txId;
   const cat = modal.dataset.selectedCat;
   const note = $('#label-note').value;
+  const subscriptionId = $('#label-subscription-select').value || null;
   if (!cat) { alert('Chọn 1 danh mục'); return; }
   $('#save-label-btn').disabled = true;
   try {
     const newData = await ghUpdateJson('data/transactions.json', (data) => {
       const list = data || [];
       const idx = list.findIndex(t => t.id === txId);
-      if (idx >= 0) { list[idx].category = cat; list[idx].note = note; list[idx].labeled = true; }
+      if (idx >= 0) { list[idx].category = cat; list[idx].note = note; list[idx].labeled = true; list[idx].subscription_id = subscriptionId; }
       return list;
     }, `label: ${txId}`);
     STATE.transactions = newData;
@@ -816,11 +827,13 @@ function renderSubsList() {
   STATE.subscriptions.forEach(s => {
     const row = document.createElement('div');
     row.className = 'sub-item';
+    const dueDayText = s.due_day ? ` · Hạn nộp: ngày ${s.due_day}` : '';
     row.innerHTML = `
-      <div><div class="sub-name">${iconFor(s.category)} ${s.name}</div><div class="sub-meta">${s.category} · mặc định</div></div>
-      <div style="display:flex; align-items:center;"><span class="sub-amount sub-default-amount" data-id="${s.id}" style="cursor:pointer; text-decoration:underline dotted;">${fmtMoney(s.default_amount ?? s.amount)}</span><button class="sub-remove" data-id="${s.id}">✕</button></div>`;
+      <div><div class="sub-name">${iconFor(s.category)} ${s.name}</div><div class="sub-meta">${s.category} · mặc định${dueDayText}</div></div>
+      <div style="display:flex; align-items:center;"><span class="sub-amount sub-default-amount" data-id="${s.id}" style="cursor:pointer; text-decoration:underline dotted;">${fmtMoney(s.default_amount ?? s.amount)}</span><button class="sub-edit-full" data-id="${s.id}" style="background:none; border:none; color:var(--muted); font-size:16px; padding:0 6px;">✏️</button><button class="sub-remove" data-id="${s.id}">✕</button></div>`;
     row.querySelector('.sub-remove').addEventListener('click', () => removeSubscription(s.id));
     row.querySelector('.sub-default-amount').addEventListener('click', () => openSubDefaultEditModal(s.id));
+    row.querySelector('.sub-edit-full').addEventListener('click', () => openSubFullEditModal(s.id));
     wrap.appendChild(row);
   });
 }
@@ -835,20 +848,74 @@ function openSubDefaultEditModal(subId) {
   $('#sub-edit-amount-input').value = sub.default_amount ?? sub.amount ?? '';
   openModal(modal);
 }
+
+function openSubFullEditModal(subId) {
+  const sub = STATE.subscriptions.find(s => s.id === subId);
+  if (!sub) return;
+  const modal = $('#sub-full-edit-modal');
+  modal.dataset.subId = subId;
+  $('#sub-full-edit-name-input').value = sub.name || '';
+  $('#sub-full-edit-amount-input').value = sub.default_amount ?? sub.amount ?? '';
+  $('#sub-full-edit-due-day-input').value = sub.due_day ?? '';
+  const catSel = $('#sub-full-edit-category-input');
+  catSel.innerHTML = '';
+  STATE.categories.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    if (c === sub.category) opt.selected = true;
+    catSel.appendChild(opt);
+  });
+  openModal(modal);
+}
+
+async function saveSubFullEdit() {
+  const modal = $('#sub-full-edit-modal');
+  const subId = modal.dataset.subId;
+  const name = $('#sub-full-edit-name-input').value.trim();
+  const amount = parseFloat($('#sub-full-edit-amount-input').value);
+  const category = $('#sub-full-edit-category-input').value;
+  const dueDayRaw = $('#sub-full-edit-due-day-input').value;
+  const dueDay = dueDayRaw ? Math.min(31, Math.max(1, parseInt(dueDayRaw, 10))) : null;
+  if (!name || !amount) { alert('Nhập đủ tên và số tiền'); return; }
+  $('#sub-full-edit-save-btn').disabled = true;
+  try {
+    const newData = await ghUpdateJson('data/subscriptions.json', (data) => {
+      const list = data || [];
+      const idx = list.findIndex(s => s.id === subId);
+      if (idx >= 0) {
+        list[idx].name = name;
+        list[idx].category = category;
+        list[idx].default_amount = amount;
+        list[idx].due_day = dueDay;
+      }
+      return list;
+    }, `edit subscription: ${subId}`);
+    STATE.subscriptions = newData;
+    closeModal(modal);
+    renderSubsList();
+    renderSubsSummary(monthKeyFromDate(STATE.ovPeriodDate));
+    safeRender('category-list-page', () => renderCategoryListPage());
+  } catch (e) { alert('Lưu thất bại: ' + e.message); }
+  finally { $('#sub-full-edit-save-btn').disabled = false; }
+}
+$('#sub-full-edit-save-btn').addEventListener('click', saveSubFullEdit);
+$('#sub-full-edit-close-btn').addEventListener('click', () => { closeModal($('#sub-full-edit-modal')); });
 async function addSubscription() {
   const name = $('#sub-name-input').value.trim();
   const amount = parseFloat($('#sub-amount-input').value);
   const category = $('#sub-category-input').value;
+  const dueDayRaw = $('#sub-due-day-input').value;
+  const dueDay = dueDayRaw ? Math.min(31, Math.max(1, parseInt(dueDayRaw, 10))) : null;
   if (!name || !amount) { alert('Nhập đủ tên và số tiền'); return; }
   $('#add-sub-btn').disabled = true;
   try {
     const newData = await ghUpdateJson('data/subscriptions.json', (data) => {
       const list = data || [];
-      list.push({ id: 'sub_' + Date.now(), name, default_amount: amount, category, overrides: {} });
+      list.push({ id: 'sub_' + Date.now(), name, default_amount: amount, category, due_day: dueDay, overrides: {} });
       return list;
     }, `add subscription: ${name}`);
     STATE.subscriptions = newData;
-    $('#sub-name-input').value = ''; $('#sub-amount-input').value = '';
+    $('#sub-name-input').value = ''; $('#sub-amount-input').value = ''; $('#sub-due-day-input').value = '';
     renderSubsList();
     renderSubsSummary(monthKeyFromDate(STATE.ovPeriodDate));
     safeRender('category-list-page', () => renderCategoryListPage());

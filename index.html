@@ -325,6 +325,8 @@
       <input id="sub-amount-input" type="number" placeholder="VD: 260000 (có thể chỉnh riêng từng tháng sau)">
       <div class="field-label">Danh mục</div>
       <select id="sub-category-input"></select>
+      <div class="field-label">Hạn nộp (ngày trong tháng, không bắt buộc)</div>
+      <input id="sub-due-day-input" type="number" min="1" max="31" placeholder="VD: 5">
       <button id="add-sub-btn" class="btn-primary">Thêm khoản cố định</button>
     </div>
   </section>
@@ -353,6 +355,8 @@
     <div style="font-size:11px; color:var(--muted); margin-bottom:4px;" id="label-time"></div>
     <div style="font-size:22px; font-weight:800; margin-bottom:14px;" id="label-amount"></div>
     <div class="chip-wrap" id="category-chips"></div>
+    <div class="field-label">Phí cố định</div>
+    <select id="label-subscription-select"><option value="">Không</option></select>
     <textarea id="label-note" placeholder="Ghi chú: mục đích, từ đâu..." rows="2"></textarea>
     <button id="save-label-btn" class="btn-primary">Lưu</button>
     <button id="delete-tx-btn" class="btn-danger">Xoá giao dịch này</button>
@@ -367,6 +371,22 @@
     <input id="sub-edit-amount-input" type="number" placeholder="Số tiền">
     <button id="sub-edit-save-btn" class="btn-primary">Lưu</button>
     <button id="sub-edit-close-btn" class="btn-secondary">Đóng</button>
+  </div>
+</div>
+
+<div class="modal" id="sub-full-edit-modal">
+  <div class="modal-box">
+    <h3>Sửa khoản cố định</h3>
+    <div class="field-label">Tên</div>
+    <input id="sub-full-edit-name-input" placeholder="VD: Netflix, tiền nhà, gym...">
+    <div class="field-label">Danh mục</div>
+    <select id="sub-full-edit-category-input"></select>
+    <div class="field-label">Số tiền mặc định / tháng</div>
+    <input id="sub-full-edit-amount-input" type="number" placeholder="VD: 260000">
+    <div class="field-label">Hạn nộp (ngày trong tháng, không bắt buộc)</div>
+    <input id="sub-full-edit-due-day-input" type="number" min="1" max="31" placeholder="VD: 5">
+    <button id="sub-full-edit-save-btn" class="btn-primary">Lưu</button>
+    <button id="sub-full-edit-close-btn" class="btn-secondary">Đóng</button>
   </div>
 </div>
 
