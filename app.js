@@ -381,7 +381,11 @@ function renderAll() {
 }
 
 function renderCategoryListPage() {
-  renderSubsSummary(catRelevantMonthKey(), '#cat-subs-section', '#cat-subs-card');
+  if (STATE.catViewMode === 'month') {
+    renderSubsSummary(catRelevantMonthKey(), '#cat-subs-section', '#cat-subs-card');
+  } else {
+    $('#cat-subs-section').style.display = 'none';
+  }
   const tx = getCategoryPageTx();
   const totals = {};
   STATE.categories.forEach(c => { totals[c] = 0; });
