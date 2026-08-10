@@ -262,6 +262,28 @@
   </section>
 </div>
 
+<!-- TRANG PHAN LOAI -->
+<div class="page" id="page-categories">
+  <div class="view-toggle">
+    <button class="view-toggle-btn active" data-mode="month">Theo tháng</button>
+    <button class="view-toggle-btn" data-mode="week">Theo tuần</button>
+    <button class="view-toggle-btn" data-mode="custom">Khoảng ngày</button>
+  </div>
+  <div class="month-nav" id="cat-month-nav">
+    <button id="cat-prev-btn">‹</button>
+    <div class="month-label" id="cat-period-label">Tháng 8/2026</div>
+    <button id="cat-next-btn">›</button>
+  </div>
+  <div class="date-range-bar" id="cat-date-range-bar" style="display:none;">
+    <input type="date" id="cat-date-start">
+    <span class="sep">–</span>
+    <input type="date" id="cat-date-end">
+  </div>
+  <section style="margin-top:0;">
+    <div class="chart-card" id="cat-list-card"></div>
+  </section>
+</div>
+
 <!-- TRANG CAI DAT -->
 <div class="page" id="page-settings">
   <section style="margin-top:16px;">
@@ -305,6 +327,7 @@
 <div class="tabbar">
   <button class="tab-btn active" data-page="page-overview"><span class="tab-icon">📊</span>Tổng quan</button>
   <button class="tab-btn" data-page="page-transactions"><span class="tab-icon">📋</span>Giao dịch</button>
+  <button class="tab-btn" data-page="page-categories"><span class="tab-icon">🏷️</span>Phân loại</button>
   <button class="tab-btn" data-page="page-settings"><span class="tab-icon">⚙️</span>Cài đặt</button>
 </div>
 

@@ -118,6 +118,7 @@ let STATE = {
   transactions: [], categories: [], budgets: { overall_monthly: null, by_category: {} },
   subscriptions: [], txCustomStart: null, txCustomEnd: null,
   ovViewMode: 'month', ovPeriodDate: new Date(), ovCustomStart: null, ovCustomEnd: null,
+  catViewMode: 'month', catPeriodDate: new Date(), catCustomStart: null, catCustomEnd: null,
   filterCategory: '', sort: 'date_desc',
   txViewMode: 'month', txPeriodDate: new Date(),
   categoryChart: null, trendChart: null
@@ -180,6 +181,19 @@ function updateOvModeUI() {
   const isCustom = STATE.ovViewMode === 'custom';
   $('#ov-month-nav').style.display = isCustom ? 'none' : 'flex';
   $('#ov-date-range-bar').style.display = isCustom ? 'flex' : 'none';
+}
+function getCategoryPageTx() {
+  if (STATE.catViewMode === 'week') {
+    return STATE.transactions.filter(t => txInWeek(t, STATE.catPeriodDate));
+  } else if (STATE.catViewMode === 'custom') {
+    return STATE.transactions.filter(t => txInRange(t, STATE.catCustomStart, STATE.catCustomEnd));
+  }
+  return STATE.transactions.filter(t => txInMonth(t, monthKeyFromDate(STATE.catPeriodDate)));
+}
+function updateCatModeUI() {
+  const isCustom = STATE.catViewMode === 'custom';
+  $('#cat-month-nav').style.display = isCustom ? 'none' : 'flex';
+  $('#cat-date-range-bar').style.display = isCustom ? 'flex' : 'none';
 }
 
 // ---------- TAB NAVIGATION ----------
@@ -291,6 +305,53 @@ $('#tx-date-end').addEventListener('change', (e) => {
   safeRender('tx-list', () => renderTxList());
 });
 
+// ---------- PHAN LOAI: dieu huong theo thang / tuan / khoang ngay ----------
+function updateCatPeriodLabel() {
+  if (STATE.catViewMode === 'custom') return;
+  $('#cat-period-label').textContent = STATE.catViewMode === 'week' ? weekLabel(STATE.catPeriodDate) : monthLabel(STATE.catPeriodDate);
+}
+$('#cat-prev-btn').addEventListener('click', () => {
+  if (STATE.catViewMode === 'week') {
+    STATE.catPeriodDate = new Date(STATE.catPeriodDate.getFullYear(), STATE.catPeriodDate.getMonth(), STATE.catPeriodDate.getDate() - 7);
+  } else {
+    STATE.catPeriodDate = new Date(STATE.catPeriodDate.getFullYear(), STATE.catPeriodDate.getMonth() - 1, 1);
+  }
+  updateCatPeriodLabel();
+  safeRender('category-list-page', () => renderCategoryListPage());
+});
+$('#cat-next-btn').addEventListener('click', () => {
+  if (STATE.catViewMode === 'week') {
+    STATE.catPeriodDate = new Date(STATE.catPeriodDate.getFullYear(), STATE.catPeriodDate.getMonth(), STATE.catPeriodDate.getDate() + 7);
+  } else {
+    STATE.catPeriodDate = new Date(STATE.catPeriodDate.getFullYear(), STATE.catPeriodDate.getMonth() + 1, 1);
+  }
+  updateCatPeriodLabel();
+  safeRender('category-list-page', () => renderCategoryListPage());
+});
+$$('#page-categories .view-toggle-btn').forEach(btn => btn.addEventListener('click', () => {
+  STATE.catViewMode = btn.dataset.mode;
+  $$('#page-categories .view-toggle-btn').forEach(b => b.classList.toggle('active', b === btn));
+  updateCatModeUI();
+  if (STATE.catViewMode === 'custom' && !STATE.catCustomStart && !STATE.catCustomEnd) {
+    const now = new Date();
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    STATE.catCustomStart = toDateInputValue(firstOfMonth);
+    STATE.catCustomEnd = toDateInputValue(now);
+    $('#cat-date-start').value = STATE.catCustomStart;
+    $('#cat-date-end').value = STATE.catCustomEnd;
+  }
+  updateCatPeriodLabel();
+  safeRender('category-list-page', () => renderCategoryListPage());
+}));
+$('#cat-date-start').addEventListener('change', (e) => {
+  STATE.catCustomStart = e.target.value;
+  safeRender('category-list-page', () => renderCategoryListPage());
+});
+$('#cat-date-end').addEventListener('change', (e) => {
+  STATE.catCustomEnd = e.target.value;
+  safeRender('category-list-page', () => renderCategoryListPage());
+});
+
 // ---------- RENDER ----------
 function safeRender(name, fn) {
   try { fn(); } catch (e) { console.error(`Loi render ${name}:`, e); }
@@ -310,6 +371,44 @@ function renderAll() {
   safeRender('overview', () => renderOverview());
   updateTxPeriodLabel();
   safeRender('tx-list', () => renderTxList());
+  updateCatPeriodLabel();
+  safeRender('category-list-page', () => renderCategoryListPage());
+}
+
+function renderCategoryListPage() {
+  const tx = getCategoryPageTx();
+  const totals = {};
+  STATE.categories.forEach(c => { totals[c] = 0; });
+  let uncategorized = 0;
+  tx.forEach(t => {
+    const c = t.category;
+    if (c && totals.hasOwnProperty(c)) totals[c] += Number(t.so_tien || 0);
+    else if (c) totals[c] = (totals[c] || 0) + Number(t.so_tien || 0);
+    else uncategorized += Number(t.so_tien || 0);
+  });
+  const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+
+  const card = $('#cat-list-card');
+  let html = '';
+  if (entries.every(([, amt]) => amt === 0) && uncategorized === 0) {
+    html = '<div class="empty-state">Chưa có giao dịch trong khoảng thời gian này</div>';
+  } else {
+    entries.forEach(([cat, amt]) => {
+      html += `
+      <div class="cat-row">
+        <div class="cat-left"><span>${iconFor(cat)} ${cat}</span></div>
+        <div class="cat-amount">${fmtMoney(amt)}</div>
+      </div>`;
+    });
+    if (uncategorized > 0) {
+      html += `
+      <div class="cat-row">
+        <div class="cat-left"><span>📦 Chưa phân loại</span></div>
+        <div class="cat-amount">${fmtMoney(uncategorized)}</div>
+      </div>`;
+    }
+  }
+  card.innerHTML = html;
 }
 
 function renderSummary(tx) {
