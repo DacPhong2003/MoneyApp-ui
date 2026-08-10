@@ -69,8 +69,32 @@ let STATE = {
   transactions: [], categories: [], budgets: { overall_monthly: null, by_category: {} },
   subscriptions: [], notifications: [],
   currentMonthDate: new Date(), filterCategory: '', sort: 'date_desc',
+  txViewMode: 'month', txPeriodDate: new Date(),
   categoryChart: null, trendChart: null
 };
+
+function getWeekRange(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay(); // 0 = CN, 1 = T2 ... 6 = T7
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const start = new Date(d);
+  start.setDate(d.getDate() + diffToMonday);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
+function fmtShortDate(d) { return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`; }
+function weekLabel(date) {
+  const { start, end } = getWeekRange(date);
+  return `Tuần ${fmtShortDate(start)} - ${fmtShortDate(end)}`;
+}
+function txInWeek(t, refDate) {
+  const { start, end } = getWeekRange(refDate);
+  const d = parseTxDate(t.thoi_gian_giao_dich);
+  return d >= start && d <= end;
+}
 
 async function loadAll() {
   const [tx, cats, budgets, subs, notifs] = await Promise.all([
@@ -104,16 +128,52 @@ function switchTab(pageId) {
 }
 $$('.tab-btn').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.page)));
 
-function updateMonthLabels() {
-  $$('.month-label').forEach(el => { el.textContent = monthLabel(STATE.currentMonthDate); });
-}
-$$('.prev-month-btn').forEach(b => b.addEventListener('click', () => {
+// ---------- OVERVIEW: dieu huong theo thang ----------
+function updateOverviewLabel() { $('#ov-month-label').textContent = monthLabel(STATE.currentMonthDate); }
+$('#ov-prev-btn').addEventListener('click', () => {
   STATE.currentMonthDate = new Date(STATE.currentMonthDate.getFullYear(), STATE.currentMonthDate.getMonth() - 1, 1);
-  renderAll();
-}));
-$$('.next-month-btn').forEach(b => b.addEventListener('click', () => {
+  renderOverview();
+});
+$('#ov-next-btn').addEventListener('click', () => {
   STATE.currentMonthDate = new Date(STATE.currentMonthDate.getFullYear(), STATE.currentMonthDate.getMonth() + 1, 1);
-  renderAll();
+  renderOverview();
+});
+function renderOverview() {
+  const monthKey = monthKeyFromDate(STATE.currentMonthDate);
+  updateOverviewLabel();
+  safeRender('summary', () => renderSummary(monthKey));
+  safeRender('subs-summary', () => renderSubsSummary(monthKey));
+  safeRender('category-chart', () => renderCategoryChart(monthKey));
+  safeRender('trend-chart', () => renderTrendChart());
+}
+
+// ---------- GIAO DICH: dieu huong theo thang HOAC theo tuan ----------
+function updateTxPeriodLabel() {
+  $('#tx-period-label').textContent = STATE.txViewMode === 'week' ? weekLabel(STATE.txPeriodDate) : monthLabel(STATE.txPeriodDate);
+}
+$('#tx-prev-btn').addEventListener('click', () => {
+  if (STATE.txViewMode === 'week') {
+    STATE.txPeriodDate = new Date(STATE.txPeriodDate.getFullYear(), STATE.txPeriodDate.getMonth(), STATE.txPeriodDate.getDate() - 7);
+  } else {
+    STATE.txPeriodDate = new Date(STATE.txPeriodDate.getFullYear(), STATE.txPeriodDate.getMonth() - 1, 1);
+  }
+  updateTxPeriodLabel();
+  safeRender('tx-list', () => renderTxList());
+});
+$('#tx-next-btn').addEventListener('click', () => {
+  if (STATE.txViewMode === 'week') {
+    STATE.txPeriodDate = new Date(STATE.txPeriodDate.getFullYear(), STATE.txPeriodDate.getMonth(), STATE.txPeriodDate.getDate() + 7);
+  } else {
+    STATE.txPeriodDate = new Date(STATE.txPeriodDate.getFullYear(), STATE.txPeriodDate.getMonth() + 1, 1);
+  }
+  updateTxPeriodLabel();
+  safeRender('tx-list', () => renderTxList());
+});
+$$('.view-toggle-btn').forEach(btn => btn.addEventListener('click', () => {
+  STATE.txViewMode = btn.dataset.mode;
+  $$('.view-toggle-btn').forEach(b => b.classList.toggle('active', b === btn));
+  updateTxPeriodLabel();
+  safeRender('tx-list', () => renderTxList());
 }));
 
 // ---------- RENDER ----------
@@ -122,9 +182,6 @@ function safeRender(name, fn) {
 }
 
 function renderAll() {
-  const monthKey = monthKeyFromDate(STATE.currentMonthDate);
-  updateMonthLabels();
-
   const unlabeled = STATE.transactions.filter(t => !t.labeled);
   const banner = $('#unlabeled-banner');
   if (unlabeled.length > 0) {
@@ -135,11 +192,9 @@ function renderAll() {
     banner.style.display = 'none';
   }
 
-  safeRender('summary', () => renderSummary(monthKey));
-  safeRender('subs-summary', () => renderSubsSummary(monthKey));
-  safeRender('category-chart', () => renderCategoryChart(monthKey));
-  safeRender('trend-chart', () => renderTrendChart());
-  safeRender('tx-list', () => renderTxList(monthKey));
+  safeRender('overview', () => renderOverview());
+  updateTxPeriodLabel();
+  safeRender('tx-list', () => renderTxList());
   safeRender('notifications', () => renderNotifications());
 }
 
@@ -297,14 +352,17 @@ function renderTrendChart() {
   });
 }
 
-function renderTxList(monthKey) {
-  let list = STATE.transactions.filter(t => txInMonth(t, monthKey));
+function renderTxList() {
+  let list = STATE.txViewMode === 'week'
+    ? STATE.transactions.filter(t => txInWeek(t, STATE.txPeriodDate))
+    : STATE.transactions.filter(t => txInMonth(t, monthKeyFromDate(STATE.txPeriodDate)));
   if (STATE.filterCategory) list = list.filter(t => t.category === STATE.filterCategory);
   const sortFns = {
     date_desc: (a, b) => parseTxDate(b.thoi_gian_giao_dich) - parseTxDate(a.thoi_gian_giao_dich),
     date_asc: (a, b) => parseTxDate(a.thoi_gian_giao_dich) - parseTxDate(b.thoi_gian_giao_dich),
     amount_desc: (a, b) => Number(b.so_tien || 0) - Number(a.so_tien || 0),
-    amount_asc: (a, b) => Number(a.so_tien || 0) - Number(b.so_tien || 0)
+    amount_asc: (a, b) => Number(a.so_tien || 0) - Number(b.so_tien || 0),
+    category_asc: (a, b) => (a.category || 'zzz').localeCompare(b.category || 'zzz', 'vi')
   };
   list = [...list].sort(sortFns[STATE.sort]);
 
@@ -619,7 +677,7 @@ $('#delete-tx-btn').addEventListener('click', deleteTx);
 $('#close-label-btn').addEventListener('click', () => { $('#label-modal').style.display = 'none'; });
 $('#enable-push-btn').addEventListener('click', enablePush);
 $('#refresh-btn').addEventListener('click', boot);
-$('#filter-category').addEventListener('change', (e) => { STATE.filterCategory = e.target.value; renderTxList(monthKeyFromDate(STATE.currentMonthDate)); });
-$('#sort-select').addEventListener('change', (e) => { STATE.sort = e.target.value; renderTxList(monthKeyFromDate(STATE.currentMonthDate)); });
+$('#filter-category').addEventListener('change', (e) => { STATE.filterCategory = e.target.value; renderTxList(); });
+$('#sort-select').addEventListener('change', (e) => { STATE.sort = e.target.value; renderTxList(); });
 
 init();
