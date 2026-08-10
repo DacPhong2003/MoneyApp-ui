@@ -12,58 +12,44 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <style>
   :root {
-    --bg: #0b1020;
-    --card: #161d34;
-    --card-2: #1d2542;
-    --border: #2a3358;
-    --text: #eef1fb;
-    --muted: #8b93b8;
-    --accent: #6dd5a4;
-    --accent-2: #5b8cff;
-    --danger: #ff6b6b;
-    --warn: #ffb454;
+    --bg: #0b1020; --card: #161d34; --card-2: #1d2542; --border: #2a3358;
+    --text: #eef1fb; --muted: #8b93b8; --accent: #6dd5a4; --accent-2: #5b8cff;
+    --danger: #ff6b6b; --warn: #ffb454;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
   body {
     margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: linear-gradient(180deg, #0b1020 0%, #0e1428 100%);
-    color: var(--text); padding-bottom: 48px; min-height: 100vh;
+    color: var(--text); min-height: 100vh; padding-bottom: 78px;
   }
   header {
-    padding: 22px 18px 10px; display: flex; justify-content: space-between; align-items: center;
-    position: sticky; top: 0; background: rgba(11,16,32,0.85); backdrop-filter: blur(10px); z-index: 10;
+    padding: 20px 18px 10px; display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; background: rgba(11,16,32,0.9); backdrop-filter: blur(10px); z-index: 10;
   }
-  header h1 { font-size: 19px; margin: 0; font-weight: 700; letter-spacing: -0.2px; }
+  header h1 { font-size: 18px; margin: 0; font-weight: 700; }
   .icon-btn {
     background: var(--card-2); color: var(--text); border: 1px solid var(--border); border-radius: 10px;
-    width: 38px; height: 38px; font-size: 15px; display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; font-size: 14px; display: inline-flex; align-items: center; justify-content: center;
   }
-  header .actions { display: flex; gap: 8px; }
+
+  .page { display: none; }
+  .page.active { display: block; }
 
   #unlabeled-banner {
     display: none; margin: 4px 16px 12px; background: linear-gradient(90deg, #7a2b2b, #5a1f1f);
     color: #ffd6d6; padding: 12px 14px; border-radius: 12px; font-size: 13.5px; font-weight: 600;
-    display: none; align-items: center; gap: 8px; border: 1px solid #8a3838;
+    align-items: center; gap: 8px; border: 1px solid #8a3838;
   }
 
-  .month-nav {
-    display: flex; align-items: center; justify-content: space-between; margin: 4px 16px 14px;
-  }
-  .month-nav button {
-    background: var(--card-2); border: 1px solid var(--border); color: var(--text);
-    width: 34px; height: 34px; border-radius: 9px; font-size: 15px;
-  }
+  .month-nav { display: flex; align-items: center; justify-content: space-between; margin: 4px 16px 14px; }
+  .month-nav button { background: var(--card-2); border: 1px solid var(--border); color: var(--text); width: 34px; height: 34px; border-radius: 9px; font-size: 15px; }
   .month-nav .month-label { font-size: 15px; font-weight: 700; }
 
-  .summary-card {
-    margin: 0 16px 14px; background: linear-gradient(135deg, var(--card), var(--card-2));
-    border-radius: 18px; padding: 18px; border: 1px solid var(--border);
-  }
+  .summary-card { margin: 0 16px 14px; background: linear-gradient(135deg, var(--card), var(--card-2)); border-radius: 18px; padding: 18px; border: 1px solid var(--border); }
   .summary-total { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; }
   .summary-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
-  .budget-bar-track {
-    height: 8px; background: #0b1020; border-radius: 6px; margin-top: 12px; overflow: hidden;
-  }
+  .budget-bar-track { height: 8px; background: #0b1020; border-radius: 6px; margin-top: 12px; overflow: hidden; }
   .budget-bar-fill { height: 100%; border-radius: 6px; background: var(--accent); transition: width .3s; }
   .budget-bar-fill.warn { background: var(--warn); }
   .budget-bar-fill.over { background: var(--danger); }
@@ -71,14 +57,8 @@
 
   section { margin: 0 16px 18px; }
   section h2 { font-size: 14px; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
-
-  .chart-card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px;
-  }
-  .cat-row {
-    display: flex; align-items: center; justify-content: space-between; padding: 10px 0;
-    border-bottom: 1px solid var(--border); font-size: 13.5px;
-  }
+  .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
+  .cat-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
   .cat-row:last-child { border-bottom: none; }
   .cat-left { display: flex; align-items: center; gap: 8px; }
   .cat-dot { width: 9px; height: 9px; border-radius: 50%; }
@@ -86,132 +66,197 @@
   .cat-budget-mini { font-size: 11px; color: var(--muted); }
 
   .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 2px; }
-  .filter-bar select {
-    background: var(--card-2); color: var(--text); border: 1px solid var(--border); border-radius: 10px;
-    padding: 8px 10px; font-size: 13px; flex-shrink: 0;
-  }
+  .filter-bar select { background: var(--card-2); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; font-size: 13px; flex-shrink: 0; }
 
-  .tx-item {
-    display: flex; justify-content: space-between; align-items: center;
-    background: var(--card); padding: 13px 14px; border-radius: 13px; margin-bottom: 8px;
-    border: 1px solid var(--border);
-  }
+  .tx-item { display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 13px 14px; border-radius: 13px; margin-bottom: 8px; border: 1px solid var(--border); }
   .tx-unlabeled { border-color: var(--danger); box-shadow: 0 0 0 1px rgba(255,107,107,0.25); }
   .tx-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .tx-emoji {
-    width: 36px; height: 36px; border-radius: 10px; background: var(--card-2);
-    display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0;
-  }
+  .tx-emoji { width: 36px; height: 36px; border-radius: 10px; background: var(--card-2); display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
   .tx-main { min-width: 0; }
   .tx-partner { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
   .tx-note { font-size: 11.5px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
   .tx-side { text-align: right; flex-shrink: 0; }
   .tx-amount { font-size: 14px; font-weight: 700; }
-  .amount-in { color: var(--accent); }
   .amount-out { color: var(--danger); }
   .tx-cat { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
 
   .empty-state { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 0; }
 
-  .modal {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65);
-    align-items: flex-end; justify-content: center; z-index: 50;
-  }
-  .modal-box {
-    background: var(--card); width: 100%; max-width: 480px; border-radius: 18px 18px 0 0;
-    padding: 20px; max-height: 85vh; overflow-y: auto; border-top: 1px solid var(--border);
-  }
+  .notif-item { background: var(--card); border: 1px solid var(--border); border-radius: 13px; padding: 12px 14px; margin-bottom: 8px; }
+  .notif-title { font-size: 13.5px; font-weight: 700; }
+  .notif-body { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .notif-time { font-size: 10.5px; color: var(--muted); margin-top: 6px; }
+
+  .sub-item { display: flex; justify-content: space-between; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 11px 14px; margin-bottom: 8px; }
+  .sub-item .sub-name { font-size: 13.5px; font-weight: 600; }
+  .sub-item .sub-meta { font-size: 11px; color: var(--muted); }
+  .sub-item .sub-amount { font-size: 13.5px; font-weight: 700; }
+  .sub-remove { background: none; border: none; color: var(--danger); font-size: 18px; padding: 0 4px; margin-left: 8px; }
+
+  .cat-tag { display: inline-flex; align-items: center; gap: 6px; background: var(--card-2); border: 1px solid var(--border); border-radius: 20px; padding: 6px 10px 6px 12px; font-size: 12.5px; margin: 0 6px 6px 0; }
+  .cat-tag button { background: none; border: none; color: var(--muted); font-size: 14px; padding: 0; }
+
+  .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); align-items: flex-end; justify-content: center; z-index: 50; }
+  .modal-box { background: var(--card); width: 100%; max-width: 480px; border-radius: 18px 18px 0 0; padding: 20px; max-height: 85vh; overflow-y: auto; border-top: 1px solid var(--border); }
   .modal-box h3 { margin-top: 0; font-size: 17px; }
   .chip-wrap { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-  .chip {
-    background: var(--card-2); color: var(--text); border: 1px solid var(--border); border-radius: 20px;
-    padding: 8px 13px; font-size: 12.5px;
-  }
+  .chip { background: var(--card-2); color: var(--text); border: 1px solid var(--border); border-radius: 20px; padding: 8px 13px; font-size: 12.5px; }
   .chip-selected { background: var(--accent); color: #0b1020; border-color: var(--accent); font-weight: 700; }
-  .modal-box input, .modal-box textarea, .modal-box select {
+  input, textarea, select {
     width: 100%; background: #0b1020; border: 1px solid var(--border); color: var(--text);
-    border-radius: 10px; padding: 11px; font-size: 14px; margin-bottom: 12px;
+    border-radius: 10px; padding: 11px; font-size: 14px; margin-bottom: 12px; font-family: inherit;
   }
-  .modal-box label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; }
-  .btn-primary {
-    width: 100%; background: var(--accent); color: #0b1020; border: none; border-radius: 12px;
-    padding: 13px; font-size: 15px; font-weight: 700;
-  }
-  .btn-danger {
-    width: 100%; background: transparent; color: var(--danger); border: 1px solid var(--danger);
-    border-radius: 12px; padding: 11px; font-size: 14px; font-weight: 600; margin-top: 8px;
-  }
-  .btn-secondary {
-    width: 100%; background: transparent; color: var(--muted); border: none; padding: 10px;
-    font-size: 13.5px; margin-top: 4px;
-  }
+  label, .field-label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; }
+  .btn-primary { width: 100%; background: var(--accent); color: #0b1020; border: none; border-radius: 12px; padding: 13px; font-size: 15px; font-weight: 700; }
+  .btn-danger { width: 100%; background: transparent; color: var(--danger); border: 1px solid var(--danger); border-radius: 12px; padding: 11px; font-size: 14px; font-weight: 600; margin-top: 8px; }
+  .btn-secondary { width: 100%; background: transparent; color: var(--muted); border: none; padding: 10px; font-size: 13.5px; margin-top: 4px; }
   #push-status { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
-  .settings-section { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
-  .settings-section:last-child { border-bottom: none; }
-  .settings-section h4 { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+
+  .settings-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+  .settings-card h3 { font-size: 13.5px; color: var(--muted); margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.3px; }
   .budget-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .budget-row span { flex: 1; font-size: 13px; }
   .budget-row input { margin-bottom: 0; width: 110px; }
+  .inline-form { display: flex; gap: 8px; align-items: flex-end; }
+  .inline-form > div { flex: 1; }
+  .inline-form input, .inline-form select { margin-bottom: 0; }
+  .inline-form button { flex-shrink: 0; background: var(--accent-2); color: #fff; border: none; border-radius: 10px; padding: 11px 14px; font-size: 14px; font-weight: 700; }
+
+  .tabbar {
+    position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15,20,40,0.95); backdrop-filter: blur(14px);
+    border-top: 1px solid var(--border); display: flex; padding: 8px 6px calc(8px + env(safe-area-inset-bottom));
+    z-index: 20;
+  }
+  .tab-btn { flex: 1; background: none; border: none; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10.5px; padding: 6px 0; position: relative; }
+  .tab-btn .tab-icon { font-size: 19px; }
+  .tab-btn.active { color: var(--accent); }
+  .tab-badge { position: absolute; top: 0; right: 22%; background: var(--danger); color: #fff; font-size: 9px; font-weight: 700; border-radius: 8px; padding: 1px 5px; }
 </style>
 </head>
 <body>
 
 <header>
   <h1>Chi Tiêu Cá Nhân</h1>
-  <div class="actions">
-    <button class="icon-btn" id="refresh-btn">↻</button>
-    <button class="icon-btn" id="settings-btn">⚙</button>
-  </div>
+  <button class="icon-btn" id="refresh-btn">↻</button>
 </header>
 
 <div id="unlabeled-banner"></div>
 
-<div class="month-nav">
-  <button id="prev-month-btn">‹</button>
-  <div class="month-label" id="month-label">Tháng 8/2026</div>
-  <button id="next-month-btn">›</button>
+<!-- TRANG TONG QUAN -->
+<div class="page active" id="page-overview">
+  <div class="month-nav">
+    <button class="prev-month-btn">‹</button>
+    <div class="month-label">Tháng 8/2026</div>
+    <button class="next-month-btn">›</button>
+  </div>
+
+  <div class="summary-card">
+    <div class="summary-sub">Tổng đã chi</div>
+    <div class="summary-total" id="summary-chi">0đ</div>
+    <div class="budget-bar-track" id="budget-bar-wrap" style="display:none;">
+      <div class="budget-bar-fill" id="budget-bar-fill"></div>
+    </div>
+    <div class="budget-text" id="budget-text"></div>
+    <button id="enable-push-btn" class="btn-primary" style="margin-top:14px;">Bật thông báo đẩy</button>
+    <div id="push-status"></div>
+  </div>
+
+  <section id="subs-summary-section" style="display:none;">
+    <h2>Chi phí cố định hàng tháng</h2>
+    <div class="chart-card" id="subs-summary-card"></div>
+  </section>
+
+  <section>
+    <h2>Theo danh mục</h2>
+    <div class="chart-card">
+      <canvas id="category-chart" height="180"></canvas>
+      <div id="category-breakdown" style="margin-top:10px;"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Xu hướng 6 tháng gần đây</h2>
+    <div class="chart-card"><canvas id="trend-chart" height="160"></canvas></div>
+  </section>
 </div>
 
-<div class="summary-card">
-  <div class="summary-sub">Tổng đã chi</div>
-  <div class="summary-total" id="summary-chi">0đ</div>
-  <div class="budget-bar-track" id="budget-bar-wrap" style="display:none;">
-    <div class="budget-bar-fill" id="budget-bar-fill"></div>
+<!-- TRANG GIAO DICH -->
+<div class="page" id="page-transactions">
+  <div class="month-nav">
+    <button class="prev-month-btn">‹</button>
+    <div class="month-label">Tháng 8/2026</div>
+    <button class="next-month-btn">›</button>
   </div>
-  <div class="budget-text" id="budget-text"></div>
-  <button id="enable-push-btn" class="btn-primary" style="margin-top:14px;">Bật thông báo đẩy</button>
-  <div id="push-status"></div>
+  <section style="margin-top:0;">
+    <div class="filter-bar">
+      <select id="filter-category"><option value="">Tất cả danh mục</option></select>
+      <select id="sort-select">
+        <option value="date_desc">Mới nhất</option>
+        <option value="date_asc">Cũ nhất</option>
+        <option value="amount_desc">Tiền cao nhất</option>
+        <option value="amount_asc">Tiền thấp nhất</option>
+      </select>
+    </div>
+    <div id="tx-list"></div>
+    <div id="tx-empty" class="empty-state" style="display:none;">Không có giao dịch nào khớp bộ lọc.</div>
+  </section>
 </div>
 
-<section>
-  <h2>Theo danh mục</h2>
-  <div class="chart-card">
-    <canvas id="category-chart" height="180"></canvas>
-    <div id="category-breakdown" style="margin-top:10px;"></div>
-  </div>
-</section>
+<!-- TRANG THONG BAO -->
+<div class="page" id="page-notifications">
+  <section style="margin-top:16px;">
+    <h2>Lịch sử thông báo đẩy</h2>
+    <div id="notif-list"></div>
+    <div id="notif-empty" class="empty-state" style="display:none;">Chưa có thông báo nào.</div>
+  </section>
+</div>
 
-<section>
-  <h2>Xu hướng 6 tháng gần đây</h2>
-  <div class="chart-card">
-    <canvas id="trend-chart" height="160"></canvas>
-  </div>
-</section>
+<!-- TRANG CAI DAT -->
+<div class="page" id="page-settings">
+  <section style="margin-top:16px;">
+    <div class="settings-card">
+      <h3>GitHub Token</h3>
+      <input id="settings-token-input" type="password" placeholder="github_pat_...">
+      <button id="settings-save-token-btn" class="btn-primary">Lưu token</button>
+    </div>
 
-<section>
-  <h2>Lịch sử giao dịch</h2>
-  <div class="filter-bar">
-    <select id="filter-category"><option value="">Tất cả danh mục</option></select>
-    <select id="sort-select">
-      <option value="date_desc">Mới nhất</option>
-      <option value="date_asc">Cũ nhất</option>
-      <option value="amount_desc">Tiền cao nhất</option>
-      <option value="amount_asc">Tiền thấp nhất</option>
-    </select>
-  </div>
-  <div id="tx-list"></div>
-  <div id="tx-empty" class="empty-state" style="display:none;">Không có giao dịch nào khớp bộ lọc.</div>
-</section>
+    <div class="settings-card">
+      <h3>Ngân sách tháng (tổng)</h3>
+      <input id="budget-overall-input" type="number" placeholder="VD: 5000000">
+      <h3 style="margin-top:14px;">Ngân sách theo danh mục</h3>
+      <div id="budget-by-category"></div>
+      <button id="save-budget-btn" class="btn-primary" style="margin-top:8px;">Lưu ngân sách</button>
+    </div>
+
+    <div class="settings-card">
+      <h3>Danh mục chi tiêu</h3>
+      <div id="category-tags" style="margin-bottom:12px;"></div>
+      <div class="inline-form">
+        <div><input id="new-category-input" placeholder="Tên danh mục mới"></div>
+        <button id="add-category-btn">Thêm</button>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h3>Chi phí cố định hàng tháng (subscription)</h3>
+      <div id="subs-list" style="margin-bottom:12px;"></div>
+      <div class="field-label">Tên</div>
+      <input id="sub-name-input" placeholder="VD: Netflix, tiền nhà, gym...">
+      <div class="field-label">Số tiền / tháng</div>
+      <input id="sub-amount-input" type="number" placeholder="VD: 260000">
+      <div class="field-label">Danh mục</div>
+      <select id="sub-category-input"></select>
+      <button id="add-sub-btn" class="btn-primary">Thêm khoản cố định</button>
+    </div>
+  </section>
+</div>
+
+<div class="tabbar">
+  <button class="tab-btn active" data-page="page-overview"><span class="tab-icon">📊</span>Tổng quan</button>
+  <button class="tab-btn" data-page="page-transactions"><span class="tab-icon">📋</span>Giao dịch</button>
+  <button class="tab-btn" data-page="page-notifications"><span class="tab-icon">🔔</span>Thông báo<span class="tab-badge" id="notif-badge" style="display:none;"></span></button>
+  <button class="tab-btn" data-page="page-settings"><span class="tab-icon">⚙️</span>Cài đặt</button>
+</div>
 
 <div class="modal" id="token-modal">
   <div class="modal-box">
@@ -232,27 +277,6 @@
     <button id="save-label-btn" class="btn-primary">Lưu</button>
     <button id="delete-tx-btn" class="btn-danger">Xoá giao dịch này</button>
     <button id="close-label-btn" class="btn-secondary">Đóng</button>
-  </div>
-</div>
-
-<div class="modal" id="settings-modal">
-  <div class="modal-box">
-    <h3>Cài đặt</h3>
-    <div class="settings-section">
-      <h4>GITHUB TOKEN</h4>
-      <input id="settings-token-input" type="password" placeholder="github_pat_...">
-      <button id="settings-save-token-btn" class="btn-primary">Lưu token</button>
-    </div>
-    <div class="settings-section">
-      <h4>NGÂN SÁCH THÁNG (TỔNG)</h4>
-      <input id="budget-overall-input" type="number" placeholder="VD: 5000000">
-    </div>
-    <div class="settings-section">
-      <h4>NGÂN SÁCH THEO DANH MỤC</h4>
-      <div id="budget-by-category"></div>
-    </div>
-    <button id="save-budget-btn" class="btn-primary">Lưu ngân sách</button>
-    <button id="close-settings-btn" class="btn-secondary">Đóng</button>
   </div>
 </div>
 
