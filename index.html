@@ -8,113 +8,215 @@
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0f172a">
+<meta name="theme-color" content="#0b1020">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <style>
-  * { box-sizing: border-box; }
+  :root {
+    --bg: #0b1020;
+    --card: #161d34;
+    --card-2: #1d2542;
+    --border: #2a3358;
+    --text: #eef1fb;
+    --muted: #8b93b8;
+    --accent: #6dd5a4;
+    --accent-2: #5b8cff;
+    --danger: #ff6b6b;
+    --warn: #ffb454;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
     margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #0f172a; color: #e2e8f0; padding-bottom: 40px;
+    background: linear-gradient(180deg, #0b1020 0%, #0e1428 100%);
+    color: var(--text); padding-bottom: 48px; min-height: 100vh;
   }
   header {
-    padding: 20px 16px 12px; display: flex; justify-content: space-between; align-items: center;
+    padding: 22px 18px 10px; display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; background: rgba(11,16,32,0.85); backdrop-filter: blur(10px); z-index: 10;
   }
-  header h1 { font-size: 20px; margin: 0; }
-  header button {
-    background: #1e293b; color: #e2e8f0; border: none; border-radius: 8px;
-    padding: 8px 12px; font-size: 14px;
+  header h1 { font-size: 19px; margin: 0; font-weight: 700; letter-spacing: -0.2px; }
+  .icon-btn {
+    background: var(--card-2); color: var(--text); border: 1px solid var(--border); border-radius: 10px;
+    width: 38px; height: 38px; font-size: 15px; display: inline-flex; align-items: center; justify-content: center;
   }
+  header .actions { display: flex; gap: 8px; }
+
   #unlabeled-banner {
-    display: none; margin: 0 16px 12px; background: #7f1d1d; color: #fecaca;
-    padding: 10px 14px; border-radius: 10px; font-size: 14px; font-weight: 600;
+    display: none; margin: 4px 16px 12px; background: linear-gradient(90deg, #7a2b2b, #5a1f1f);
+    color: #ffd6d6; padding: 12px 14px; border-radius: 12px; font-size: 13.5px; font-weight: 600;
+    display: none; align-items: center; gap: 8px; border: 1px solid #8a3838;
   }
+
+  .month-nav {
+    display: flex; align-items: center; justify-content: space-between; margin: 4px 16px 14px;
+  }
+  .month-nav button {
+    background: var(--card-2); border: 1px solid var(--border); color: var(--text);
+    width: 34px; height: 34px; border-radius: 9px; font-size: 15px;
+  }
+  .month-nav .month-label { font-size: 15px; font-weight: 700; }
+
   .summary-card {
-    margin: 0 16px 16px; background: #1e293b; border-radius: 14px; padding: 16px;
+    margin: 0 16px 14px; background: linear-gradient(135deg, var(--card), var(--card-2));
+    border-radius: 18px; padding: 18px; border: 1px solid var(--border);
   }
-  .summary-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px; }
-  .summary-row .chi { color: #f87171; font-weight: 700; }
-  .summary-row .thu { color: #4ade80; font-weight: 700; }
-  section { margin: 0 16px 20px; }
-  section h2 { font-size: 15px; color: #94a3b8; margin: 0 0 10px; }
+  .summary-total { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; }
+  .summary-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .budget-bar-track {
+    height: 8px; background: #0b1020; border-radius: 6px; margin-top: 12px; overflow: hidden;
+  }
+  .budget-bar-fill { height: 100%; border-radius: 6px; background: var(--accent); transition: width .3s; }
+  .budget-bar-fill.warn { background: var(--warn); }
+  .budget-bar-fill.over { background: var(--danger); }
+  .budget-text { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+
+  section { margin: 0 16px 18px; }
+  section h2 { font-size: 14px; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+
+  .chart-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px;
+  }
   .cat-row {
-    display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px;
-    border-bottom: 1px solid #1e293b;
+    display: flex; align-items: center; justify-content: space-between; padding: 10px 0;
+    border-bottom: 1px solid var(--border); font-size: 13.5px;
   }
+  .cat-row:last-child { border-bottom: none; }
+  .cat-left { display: flex; align-items: center; gap: 8px; }
+  .cat-dot { width: 9px; height: 9px; border-radius: 50%; }
+  .cat-amount { font-weight: 700; }
+  .cat-budget-mini { font-size: 11px; color: var(--muted); }
+
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 2px; }
+  .filter-bar select {
+    background: var(--card-2); color: var(--text); border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 10px; font-size: 13px; flex-shrink: 0;
+  }
+
   .tx-item {
     display: flex; justify-content: space-between; align-items: center;
-    background: #1e293b; padding: 12px 14px; border-radius: 10px; margin-bottom: 8px;
+    background: var(--card); padding: 13px 14px; border-radius: 13px; margin-bottom: 8px;
+    border: 1px solid var(--border);
   }
-  .tx-unlabeled { border: 1px solid #f87171; }
-  .tx-partner { font-size: 14px; font-weight: 600; }
-  .tx-note { font-size: 12px; color: #94a3b8; margin-top: 2px; }
-  .tx-side { text-align: right; }
+  .tx-unlabeled { border-color: var(--danger); box-shadow: 0 0 0 1px rgba(255,107,107,0.25); }
+  .tx-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .tx-emoji {
+    width: 36px; height: 36px; border-radius: 10px; background: var(--card-2);
+    display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0;
+  }
+  .tx-main { min-width: 0; }
+  .tx-partner { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+  .tx-note { font-size: 11.5px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+  .tx-side { text-align: right; flex-shrink: 0; }
   .tx-amount { font-size: 14px; font-weight: 700; }
-  .amount-in { color: #4ade80; }
-  .amount-out { color: #f87171; }
-  .tx-cat { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .amount-in { color: var(--accent); }
+  .amount-out { color: var(--danger); }
+  .tx-cat { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+
+  .empty-state { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 0; }
+
   .modal {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65);
     align-items: flex-end; justify-content: center; z-index: 50;
   }
   .modal-box {
-    background: #1e293b; width: 100%; max-width: 480px; border-radius: 16px 16px 0 0;
-    padding: 20px; max-height: 80vh; overflow-y: auto;
+    background: var(--card); width: 100%; max-width: 480px; border-radius: 18px 18px 0 0;
+    padding: 20px; max-height: 85vh; overflow-y: auto; border-top: 1px solid var(--border);
   }
-  .modal-box h3 { margin-top: 0; }
+  .modal-box h3 { margin-top: 0; font-size: 17px; }
   .chip-wrap { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
   .chip {
-    background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 20px;
-    padding: 8px 14px; font-size: 13px;
+    background: var(--card-2); color: var(--text); border: 1px solid var(--border); border-radius: 20px;
+    padding: 8px 13px; font-size: 12.5px;
   }
-  .chip-selected { background: #22c55e; color: #0f172a; border-color: #22c55e; font-weight: 700; }
-  .modal-box input, .modal-box textarea {
-    width: 100%; background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
-    border-radius: 8px; padding: 10px; font-size: 14px; margin-bottom: 12px;
+  .chip-selected { background: var(--accent); color: #0b1020; border-color: var(--accent); font-weight: 700; }
+  .modal-box input, .modal-box textarea, .modal-box select {
+    width: 100%; background: #0b1020; border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; padding: 11px; font-size: 14px; margin-bottom: 12px;
   }
+  .modal-box label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; }
   .btn-primary {
-    width: 100%; background: #22c55e; color: #0f172a; border: none; border-radius: 10px;
-    padding: 12px; font-size: 15px; font-weight: 700;
+    width: 100%; background: var(--accent); color: #0b1020; border: none; border-radius: 12px;
+    padding: 13px; font-size: 15px; font-weight: 700;
+  }
+  .btn-danger {
+    width: 100%; background: transparent; color: var(--danger); border: 1px solid var(--danger);
+    border-radius: 12px; padding: 11px; font-size: 14px; font-weight: 600; margin-top: 8px;
   }
   .btn-secondary {
-    width: 100%; background: transparent; color: #94a3b8; border: none; padding: 10px;
-    font-size: 14px; margin-top: 6px;
+    width: 100%; background: transparent; color: var(--muted); border: none; padding: 10px;
+    font-size: 13.5px; margin-top: 4px;
   }
-  #push-status { font-size: 12px; color: #94a3b8; margin-top: 8px; }
+  #push-status { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+  .settings-section { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .settings-section:last-child { border-bottom: none; }
+  .settings-section h4 { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+  .budget-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .budget-row span { flex: 1; font-size: 13px; }
+  .budget-row input { margin-bottom: 0; width: 110px; }
 </style>
 </head>
 <body>
 
 <header>
   <h1>Chi Tiêu Cá Nhân</h1>
-  <div style="display:flex; gap:8px;">
-    <button id="refresh-btn">↻</button>
-    <button id="settings-btn">⚙</button>
+  <div class="actions">
+    <button class="icon-btn" id="refresh-btn">↻</button>
+    <button class="icon-btn" id="settings-btn">⚙</button>
   </div>
 </header>
 
 <div id="unlabeled-banner"></div>
 
+<div class="month-nav">
+  <button id="prev-month-btn">‹</button>
+  <div class="month-label" id="month-label">Tháng 8/2026</div>
+  <button id="next-month-btn">›</button>
+</div>
+
 <div class="summary-card">
-  <div style="font-size:12px; color:#94a3b8; margin-bottom:8px;">Tháng <span id="summary-month"></span></div>
-  <div class="summary-row"><span>Đã chi</span><span class="chi" id="summary-chi">0đ</span></div>
-  <div class="summary-row"><span>Đã nhận</span><span class="thu" id="summary-thu">0đ</span></div>
-  <button id="enable-push-btn" class="btn-primary" style="margin-top:10px;">Bật thông báo đẩy</button>
+  <div class="summary-sub">Tổng đã chi</div>
+  <div class="summary-total" id="summary-chi">0đ</div>
+  <div class="budget-bar-track" id="budget-bar-wrap" style="display:none;">
+    <div class="budget-bar-fill" id="budget-bar-fill"></div>
+  </div>
+  <div class="budget-text" id="budget-text"></div>
+  <button id="enable-push-btn" class="btn-primary" style="margin-top:14px;">Bật thông báo đẩy</button>
   <div id="push-status"></div>
 </div>
 
 <section>
-  <h2>Theo danh mục (tháng này)</h2>
-  <div id="category-breakdown"></div>
+  <h2>Theo danh mục</h2>
+  <div class="chart-card">
+    <canvas id="category-chart" height="180"></canvas>
+    <div id="category-breakdown" style="margin-top:10px;"></div>
+  </div>
+</section>
+
+<section>
+  <h2>Xu hướng 6 tháng gần đây</h2>
+  <div class="chart-card">
+    <canvas id="trend-chart" height="160"></canvas>
+  </div>
 </section>
 
 <section>
   <h2>Lịch sử giao dịch</h2>
+  <div class="filter-bar">
+    <select id="filter-category"><option value="">Tất cả danh mục</option></select>
+    <select id="sort-select">
+      <option value="date_desc">Mới nhất</option>
+      <option value="date_asc">Cũ nhất</option>
+      <option value="amount_desc">Tiền cao nhất</option>
+      <option value="amount_asc">Tiền thấp nhất</option>
+    </select>
+  </div>
   <div id="tx-list"></div>
+  <div id="tx-empty" class="empty-state" style="display:none;">Không có giao dịch nào khớp bộ lọc.</div>
 </section>
 
 <div class="modal" id="token-modal">
   <div class="modal-box">
     <h3>Kết nối dữ liệu</h3>
-    <p style="font-size:13px; color:#94a3b8;">Dán GitHub token (quyền Contents) — chỉ lưu trên máy này, không gửi đi đâu khác.</p>
+    <p style="font-size:13px; color:var(--muted);">Dán GitHub token (quyền Contents) — chỉ lưu trên máy này.</p>
     <input id="token-input" type="password" placeholder="github_pat_...">
     <button id="save-token-btn" class="btn-primary">Lưu</button>
   </div>
@@ -123,12 +225,34 @@
 <div class="modal" id="label-modal">
   <div class="modal-box">
     <h3>Gắn nhãn giao dịch</h3>
-    <div style="font-size:13px; color:#94a3b8; margin-bottom:4px;" id="label-partner"></div>
-    <div style="font-size:20px; font-weight:700; margin-bottom:12px;" id="label-amount"></div>
+    <div style="font-size:13px; color:var(--muted); margin-bottom:4px;" id="label-partner"></div>
+    <div style="font-size:22px; font-weight:800; margin-bottom:14px;" id="label-amount"></div>
     <div class="chip-wrap" id="category-chips"></div>
     <textarea id="label-note" placeholder="Ghi chú: mục đích, từ đâu..." rows="2"></textarea>
     <button id="save-label-btn" class="btn-primary">Lưu</button>
+    <button id="delete-tx-btn" class="btn-danger">Xoá giao dịch này</button>
     <button id="close-label-btn" class="btn-secondary">Đóng</button>
+  </div>
+</div>
+
+<div class="modal" id="settings-modal">
+  <div class="modal-box">
+    <h3>Cài đặt</h3>
+    <div class="settings-section">
+      <h4>GITHUB TOKEN</h4>
+      <input id="settings-token-input" type="password" placeholder="github_pat_...">
+      <button id="settings-save-token-btn" class="btn-primary">Lưu token</button>
+    </div>
+    <div class="settings-section">
+      <h4>NGÂN SÁCH THÁNG (TỔNG)</h4>
+      <input id="budget-overall-input" type="number" placeholder="VD: 5000000">
+    </div>
+    <div class="settings-section">
+      <h4>NGÂN SÁCH THEO DANH MỤC</h4>
+      <div id="budget-by-category"></div>
+    </div>
+    <button id="save-budget-btn" class="btn-primary">Lưu ngân sách</button>
+    <button id="close-settings-btn" class="btn-secondary">Đóng</button>
   </div>
 </div>
 

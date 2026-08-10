@@ -3,6 +3,13 @@ const DATA_REPO = 'MoneyApp';
 const BRANCH = 'main';
 const VAPID_PUBLIC_KEY = 'BAgPDNc7vCbUcO5yebFZGvyO6d6UKIp4gHpCtjmte1PsvY19aJXHjQ0iC6HCNy_wDK5lA7GPscU9xJ6VC-iPxY4';
 
+const CATEGORY_ICONS = {
+  'Ăn uống': '🍜', 'Di chuyển': '🚗', 'Mua sắm': '🛍️', 'Hoá đơn & Tiện ích': '💡',
+  'Giải trí': '🎬', 'Sức khoẻ': '💊', 'Giáo dục': '📚', 'Chuyển khoản cá nhân': '🔄',
+  'Thu nhập': '💰', 'Khác': '📦'
+};
+const CHART_COLORS = ['#6dd5a4', '#5b8cff', '#ffb454', '#ff6b6b', '#c792ea', '#4fd1c5', '#f6ad55', '#68d391', '#a0aec0', '#fc8181'];
+
 const $ = (sel) => document.querySelector(sel);
 
 function b64EncodeUnicode(str) {
@@ -11,13 +18,8 @@ function b64EncodeUnicode(str) {
 function b64DecodeUnicode(str) {
   return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
 }
-
-function getToken() {
-  return localStorage.getItem('gh_token') || '';
-}
-function setToken(t) {
-  localStorage.setItem('gh_token', t);
-}
+function getToken() { return localStorage.getItem('gh_token') || ''; }
+function setToken(t) { localStorage.setItem('gh_token', t); }
 
 async function ghGetFile(path) {
   const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${DATA_REPO}/contents/${path}?ref=${BRANCH}`, {
@@ -30,100 +32,216 @@ async function ghGetFile(path) {
 }
 
 async function ghPutFile(path, dataObj, sha, message) {
-  const body = {
-    message,
-    content: b64EncodeUnicode(JSON.stringify(dataObj, null, 2)),
-    branch: BRANCH
-  };
+  const body = { message, content: b64EncodeUnicode(JSON.stringify(dataObj, null, 2)), branch: BRANCH };
   if (sha) body.sha = sha;
   const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${DATA_REPO}/contents/${path}`, {
     method: 'PUT',
-    headers: {
-      Authorization: `token ${getToken()}`,
-      Accept: 'application/vnd.github+json',
-      'Content-Type': 'application/json'
-    },
+    headers: { Authorization: `token ${getToken()}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`PUT ${path} that bai: ${res.status} ${t}`);
-  }
+  if (!res.ok) { const t = await res.text(); throw new Error(`PUT ${path} that bai: ${res.status} ${t}`); }
   return res.json();
 }
 
-function fmtMoney(n) {
-  return Number(n || 0).toLocaleString('vi-VN') + 'đ';
+function fmtMoney(n) { return Number(n || 0).toLocaleString('vi-VN') + 'đ'; }
+function parseTxDate(iso) {
+  // ho tro ca dinh dang "dd-mm-yyyy HH:MM:SS" (tu email) va ISO
+  if (/^\d{2}-\d{2}-\d{4}/.test(iso)) {
+    const [dPart, tPart] = iso.split(' ');
+    const [d, m, y] = dPart.split('-');
+    return new Date(`${y}-${m}-${d}T${tPart || '00:00:00'}`);
+  }
+  return new Date(iso);
 }
+function monthKeyFromDate(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+function monthLabel(d) { return `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`; }
 
-function monthKey(iso) {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-let STATE = { transactions: [], txSha: null, categories: [] };
+let STATE = {
+  transactions: [], categories: [], budgets: { overall_monthly: null, by_category: {} },
+  currentMonthDate: new Date(), filterCategory: '', sort: 'date_desc',
+  categoryChart: null, trendChart: null
+};
 
 async function loadAll() {
-  const [tx, cats] = await Promise.all([
+  const [tx, cats, budgets] = await Promise.all([
     ghGetFile('data/transactions.json'),
-    ghGetFile('data/categories.json')
+    ghGetFile('data/categories.json'),
+    ghGetFile('data/budgets.json').catch(() => ({ data: { overall_monthly: null, by_category: {} }, sha: null }))
   ]);
   STATE.transactions = tx.data;
-  STATE.txSha = tx.sha;
   STATE.categories = cats.data;
+  STATE.budgets = budgets.data;
+
+  const filterSel = $('#filter-category');
+  filterSel.innerHTML = '<option value="">Tất cả danh mục</option>';
+  STATE.categories.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    filterSel.appendChild(opt);
+  });
 }
 
-function render() {
+function txInMonth(t, monthKey) {
+  return monthKeyFromDate(parseTxDate(t.thoi_gian_giao_dich)) === monthKey;
+}
+
+function renderAll() {
+  const monthKey = monthKeyFromDate(STATE.currentMonthDate);
+  $('#month-label').textContent = monthLabel(STATE.currentMonthDate);
+
   const unlabeled = STATE.transactions.filter(t => !t.labeled);
   const banner = $('#unlabeled-banner');
   if (unlabeled.length > 0) {
-    banner.style.display = 'block';
-    banner.textContent = `${unlabeled.length} giao dich chua gan nhan - bam de xu ly`;
+    banner.style.display = 'flex';
+    banner.textContent = `⚠️ ${unlabeled.length} giao dịch chưa gắn nhãn — bấm để xử lý`;
+    banner.onclick = () => openLabelModal(unlabeled[0]);
   } else {
     banner.style.display = 'none';
   }
 
-  const now = new Date();
-  const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const thisMonthTx = STATE.transactions.filter(t => monthKey(t.thoi_gian_giao_dich) === curMonth);
-  const chi = thisMonthTx.filter(t => t.chieu !== 'thu').reduce((s, t) => s + Number(t.so_tien || 0), 0);
-  const thu = thisMonthTx.filter(t => t.chieu === 'thu').reduce((s, t) => s + Number(t.so_tien || 0), 0);
-  $('#summary-chi').textContent = fmtMoney(chi);
-  $('#summary-thu').textContent = fmtMoney(thu);
-  $('#summary-month').textContent = curMonth;
+  renderSummary(monthKey);
+  renderCategoryChart(monthKey);
+  renderTrendChart();
+  renderTxList(monthKey);
+}
 
+function renderSummary(monthKey) {
+  const monthTx = STATE.transactions.filter(t => txInMonth(t, monthKey));
+  const chi = monthTx.reduce((s, t) => s + Number(t.so_tien || 0), 0);
+  $('#summary-chi').textContent = fmtMoney(chi);
+
+  const budget = STATE.budgets.overall_monthly;
+  const wrap = $('#budget-bar-wrap');
+  const fill = $('#budget-bar-fill');
+  const text = $('#budget-text');
+  if (budget && budget > 0) {
+    wrap.style.display = 'block';
+    const pct = Math.min(100, (chi / budget) * 100);
+    fill.style.width = pct + '%';
+    fill.classList.remove('warn', 'over');
+    if (chi > budget) { fill.classList.add('over'); text.textContent = `Đã vượt ngân sách ${fmtMoney(chi - budget)}`; }
+    else if (pct >= 80) { fill.classList.add('warn'); text.textContent = `Còn lại ${fmtMoney(budget - chi)} (${pct.toFixed(0)}%)`; }
+    else { text.textContent = `Còn lại ${fmtMoney(budget - chi)} trong ngân sách ${fmtMoney(budget)}`; }
+  } else {
+    wrap.style.display = 'none';
+    text.textContent = '';
+  }
+}
+
+function renderCategoryChart(monthKey) {
+  const monthTx = STATE.transactions.filter(t => txInMonth(t, monthKey));
   const byCat = {};
-  thisMonthTx.filter(t => t.chieu !== 'thu').forEach(t => {
-    const c = t.category || 'Chua phan loai';
+  monthTx.forEach(t => {
+    const c = t.category || 'Chưa phân loại';
     byCat[c] = (byCat[c] || 0) + Number(t.so_tien || 0);
   });
-  const catList = $('#category-breakdown');
-  catList.innerHTML = '';
-  Object.entries(byCat).sort((a, b) => b[1] - a[1]).forEach(([cat, amt]) => {
+  const entries = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+
+  const canvas = $('#category-chart');
+  if (STATE.categoryChart) STATE.categoryChart.destroy();
+  if (entries.length === 0) {
+    canvas.style.display = 'none';
+  } else {
+    canvas.style.display = 'block';
+    STATE.categoryChart = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: entries.map(e => e[0]),
+        datasets: [{ data: entries.map(e => e[1]), backgroundColor: entries.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]), borderWidth: 0 }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        cutout: '65%'
+      }
+    });
+  }
+
+  const list = $('#category-breakdown');
+  list.innerHTML = '';
+  if (entries.length === 0) {
+    list.innerHTML = '<div class="empty-state">Chưa có chi tiêu tháng này</div>';
+  }
+  entries.forEach(([cat, amt], i) => {
     const row = document.createElement('div');
     row.className = 'cat-row';
-    row.innerHTML = `<span>${cat}</span><span>${fmtMoney(amt)}</span>`;
-    catList.appendChild(row);
+    const catBudget = STATE.budgets.by_category?.[cat];
+    const budgetMini = catBudget ? `<div class="cat-budget-mini">${fmtMoney(amt)} / ${fmtMoney(catBudget)}${amt > catBudget ? ' ⚠️' : ''}</div>` : '';
+    row.innerHTML = `
+      <div class="cat-left">
+        <span class="cat-dot" style="background:${CHART_COLORS[i % CHART_COLORS.length]}"></span>
+        <span>${CATEGORY_ICONS[cat] || '❓'} ${cat}</span>
+      </div>
+      <div style="text-align:right;">
+        <div class="cat-amount">${fmtMoney(amt)}</div>
+        ${budgetMini}
+      </div>`;
+    list.appendChild(row);
   });
+}
 
-  const list = $('#tx-list');
-  list.innerHTML = '';
-  const sorted = [...STATE.transactions].sort((a, b) => new Date(b.thoi_gian_giao_dich) - new Date(a.thoi_gian_giao_dich));
-  sorted.forEach(t => {
+function renderTrendChart() {
+  const months = [];
+  const base = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
+    months.push({ key: monthKeyFromDate(d), label: `T${d.getMonth() + 1}` });
+  }
+  const totals = months.map(m => STATE.transactions.filter(t => txInMonth(t, m.key)).reduce((s, t) => s + Number(t.so_tien || 0), 0));
+
+  const canvas = $('#trend-chart');
+  if (STATE.trendChart) STATE.trendChart.destroy();
+  STATE.trendChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: months.map(m => m.label),
+      datasets: [{ data: totals, backgroundColor: '#5b8cff', borderRadius: 6 }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { color: '#8b93b8', callback: (v) => (v >= 1000000 ? (v / 1000000) + 'tr' : v) }, grid: { color: '#2a3358' } },
+        x: { ticks: { color: '#8b93b8' }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderTxList(monthKey) {
+  let list = STATE.transactions.filter(t => txInMonth(t, monthKey));
+  if (STATE.filterCategory) list = list.filter(t => t.category === STATE.filterCategory);
+
+  const sortFns = {
+    date_desc: (a, b) => parseTxDate(b.thoi_gian_giao_dich) - parseTxDate(a.thoi_gian_giao_dich),
+    date_asc: (a, b) => parseTxDate(a.thoi_gian_giao_dich) - parseTxDate(b.thoi_gian_giao_dich),
+    amount_desc: (a, b) => Number(b.so_tien || 0) - Number(a.so_tien || 0),
+    amount_asc: (a, b) => Number(a.so_tien || 0) - Number(b.so_tien || 0)
+  };
+  list = [...list].sort(sortFns[STATE.sort]);
+
+  const container = $('#tx-list');
+  const empty = $('#tx-empty');
+  container.innerHTML = '';
+  empty.style.display = list.length === 0 ? 'block' : 'none';
+
+  list.forEach(t => {
     const item = document.createElement('div');
     item.className = 'tx-item' + (t.labeled ? '' : ' tx-unlabeled');
+    const icon = CATEGORY_ICONS[t.category] || '❓';
     item.innerHTML = `
-      <div class="tx-main">
-        <div class="tx-partner">${t.doi_tac || 'Khong ro'}</div>
-        <div class="tx-note">${t.noi_dung || ''}</div>
+      <div class="tx-left">
+        <div class="tx-emoji">${icon}</div>
+        <div class="tx-main">
+          <div class="tx-partner">${t.doi_tac || 'Không rõ'}</div>
+          <div class="tx-note">${t.note || t.noi_dung || ''}</div>
+        </div>
       </div>
       <div class="tx-side">
-        <div class="tx-amount ${t.chieu === 'thu' ? 'amount-in' : 'amount-out'}">${t.chieu === 'thu' ? '+' : '-'}${fmtMoney(t.so_tien)}</div>
-        <div class="tx-cat">${t.category || 'Bam de gan nhan'}</div>
+        <div class="tx-amount amount-out">-${fmtMoney(t.so_tien)}</div>
+        <div class="tx-cat">${t.category || 'Bấm để gắn nhãn'}</div>
       </div>
     `;
     item.addEventListener('click', () => openLabelModal(t));
-    list.appendChild(item);
+    container.appendChild(item);
   });
 }
 
@@ -134,9 +252,9 @@ function openLabelModal(tx) {
   STATE.categories.forEach(cat => {
     const chip = document.createElement('button');
     chip.className = 'chip' + (tx.category === cat ? ' chip-selected' : '');
-    chip.textContent = cat;
+    chip.textContent = `${CATEGORY_ICONS[cat] || ''} ${cat}`;
     chip.addEventListener('click', () => {
-      document.querySelectorAll('.chip').forEach(c => c.classList.remove('chip-selected'));
+      document.querySelectorAll('#category-chips .chip').forEach(c => c.classList.remove('chip-selected'));
       chip.classList.add('chip-selected');
       modal.dataset.selectedCat = cat;
     });
@@ -155,7 +273,7 @@ async function saveLabel() {
   const txId = modal.dataset.txId;
   const cat = modal.dataset.selectedCat;
   const note = $('#label-note').value;
-  if (!cat) { alert('Chon 1 danh muc'); return; }
+  if (!cat) { alert('Chọn 1 danh mục'); return; }
 
   $('#save-label-btn').disabled = true;
   try {
@@ -169,11 +287,30 @@ async function saveLabel() {
     await ghPutFile('data/transactions.json', fresh.data, fresh.sha, `label: ${txId}`);
     STATE.transactions = fresh.data;
     modal.style.display = 'none';
-    render();
+    renderAll();
   } catch (e) {
-    alert('Luu that bai: ' + e.message);
+    alert('Lưu thất bại: ' + e.message);
   } finally {
     $('#save-label-btn').disabled = false;
+  }
+}
+
+async function deleteTx() {
+  const modal = $('#label-modal');
+  const txId = modal.dataset.txId;
+  if (!confirm('Xoá giao dịch này? Không thể hoàn tác.')) return;
+  $('#delete-tx-btn').disabled = true;
+  try {
+    const fresh = await ghGetFile('data/transactions.json');
+    const newList = fresh.data.filter(t => t.id !== txId);
+    await ghPutFile('data/transactions.json', newList, fresh.sha, `delete: ${txId}`);
+    STATE.transactions = newList;
+    modal.style.display = 'none';
+    renderAll();
+  } catch (e) {
+    alert('Xoá thất bại: ' + e.message);
+  } finally {
+    $('#delete-tx-btn').disabled = false;
   }
 }
 
@@ -186,35 +323,64 @@ function urlBase64ToUint8Array(base64String) {
 
 async function enablePush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    alert('Trinh duyet khong ho tro push. Tren iPhone: phai add app ra Home Screen truoc, mo tu icon do, khong mo qua Safari thuong.');
+    alert('Trình duyệt không hỗ trợ push. Trên iPhone: phải Add to Home Screen trước, mở từ icon đó, không mở qua Safari thường.');
     return;
   }
   const perm = await Notification.requestPermission();
-  if (perm !== 'granted') { alert('Ban chua cho phep thong bao'); return; }
-
+  if (perm !== 'granted') { alert('Bạn chưa cho phép thông báo'); return; }
   const reg = await navigator.serviceWorker.ready;
   let sub = await reg.pushManager.getSubscription();
   if (!sub) {
-    sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-    });
+    sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) });
   }
   const subJson = sub.toJSON();
-
   const fresh = await ghGetFile('data/push_subscriptions.json');
   const exists = fresh.data.some(s => s.endpoint === subJson.endpoint);
   if (!exists) {
     fresh.data.push(subJson);
     await ghPutFile('data/push_subscriptions.json', fresh.data, fresh.sha, 'add push subscription');
   }
-  $('#push-status').textContent = 'Da bat thong bao tren thiet bi nay';
+  $('#push-status').textContent = 'Đã bật thông báo trên thiết bị này';
+}
+
+function openSettingsModal() {
+  $('#settings-token-input').value = getToken();
+  $('#budget-overall-input').value = STATE.budgets.overall_monthly || '';
+  const wrap = $('#budget-by-category');
+  wrap.innerHTML = '';
+  STATE.categories.filter(c => c !== 'Thu nhập').forEach(cat => {
+    const row = document.createElement('div');
+    row.className = 'budget-row';
+    row.innerHTML = `<span>${CATEGORY_ICONS[cat] || ''} ${cat}</span><input type="number" data-cat="${cat}" placeholder="0" value="${STATE.budgets.by_category?.[cat] || ''}">`;
+    wrap.appendChild(row);
+  });
+  $('#settings-modal').style.display = 'flex';
+}
+
+async function saveBudgets() {
+  const overall = parseFloat($('#budget-overall-input').value) || null;
+  const byCat = {};
+  document.querySelectorAll('#budget-by-category input').forEach(inp => {
+    const v = parseFloat(inp.value);
+    if (v > 0) byCat[inp.dataset.cat] = v;
+  });
+  const newBudgets = { overall_monthly: overall, by_category: byCat };
+  $('#save-budget-btn').disabled = true;
+  try {
+    const fresh = await ghGetFile('data/budgets.json').catch(() => ({ data: null, sha: null }));
+    await ghPutFile('data/budgets.json', newBudgets, fresh.sha, 'update budgets');
+    STATE.budgets = newBudgets;
+    $('#settings-modal').style.display = 'none';
+    renderAll();
+  } catch (e) {
+    alert('Lưu ngân sách thất bại: ' + e.message);
+  } finally {
+    $('#save-budget-btn').disabled = false;
+  }
 }
 
 async function init() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
-  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
 
   if (!getToken()) {
     $('#token-modal').style.display = 'flex';
@@ -233,19 +399,36 @@ async function init() {
 async function boot() {
   try {
     await loadAll();
-    render();
+    renderAll();
   } catch (e) {
-    alert('Loi tai du lieu: ' + e.message + '\nKiem tra lai token trong Cai dat.');
+    alert('Lỗi tải dữ liệu: ' + e.message + '\nKiểm tra lại token trong Cài đặt.');
   }
 }
 
 $('#save-label-btn').addEventListener('click', saveLabel);
+$('#delete-tx-btn').addEventListener('click', deleteTx);
 $('#close-label-btn').addEventListener('click', () => { $('#label-modal').style.display = 'none'; });
 $('#enable-push-btn').addEventListener('click', enablePush);
 $('#refresh-btn').addEventListener('click', boot);
-$('#settings-btn').addEventListener('click', () => {
-  $('#token-input').value = getToken();
-  $('#token-modal').style.display = 'flex';
+$('#settings-btn').addEventListener('click', openSettingsModal);
+$('#close-settings-btn').addEventListener('click', () => { $('#settings-modal').style.display = 'none'; });
+$('#settings-save-token-btn').addEventListener('click', () => {
+  const t = $('#settings-token-input').value.trim();
+  if (!t) return;
+  setToken(t);
+  $('#settings-modal').style.display = 'none';
+  boot();
 });
+$('#save-budget-btn').addEventListener('click', saveBudgets);
+$('#prev-month-btn').addEventListener('click', () => {
+  STATE.currentMonthDate = new Date(STATE.currentMonthDate.getFullYear(), STATE.currentMonthDate.getMonth() - 1, 1);
+  renderAll();
+});
+$('#next-month-btn').addEventListener('click', () => {
+  STATE.currentMonthDate = new Date(STATE.currentMonthDate.getFullYear(), STATE.currentMonthDate.getMonth() + 1, 1);
+  renderAll();
+});
+$('#filter-category').addEventListener('change', (e) => { STATE.filterCategory = e.target.value; renderTxList(monthKeyFromDate(STATE.currentMonthDate)); });
+$('#sort-select').addEventListener('change', (e) => { STATE.sort = e.target.value; renderTxList(monthKeyFromDate(STATE.currentMonthDate)); });
 
 init();
