@@ -452,6 +452,10 @@ function subEffectiveAmount(sub, monthKey) {
   return (ov[monthKey] !== undefined && ov[monthKey] !== null) ? ov[monthKey] : Number(sub.default_amount || sub.amount || 0);
 }
 
+function isSubPaidInMonth(subId, monthKey) {
+  return STATE.transactions.some(t => t.subscription_id === subId && t.subscription_month === monthKey);
+}
+
 function renderSubsSummary(monthKey, sectionSel = '#subs-summary-section', cardSel = '#subs-summary-card') {
   const section = $(sectionSel);
   const card = $(cardSel);
@@ -463,9 +467,10 @@ function renderSubsSummary(monthKey, sectionSel = '#subs-summary-section', cardS
     const amt = subEffectiveAmount(s, monthKey);
     total += amt;
     const isOverridden = s.overrides && s.overrides[monthKey] !== undefined;
+    const paid = isSubPaidInMonth(s.id, monthKey);
     return `
     <div class="cat-row">
-      <div class="cat-left"><span>${iconFor(s.category)} ${s.name}${isOverridden ? ' <span style="color:var(--accent-2); font-size:10px;">(đã sửa)</span>' : ''}</span></div>
+      <div class="cat-left"><span>${iconFor(s.category)} ${s.name}${isOverridden ? ' <span style="color:var(--accent-2); font-size:10px;">(đã sửa)</span>' : ''}${paid ? ' <span style="color:var(--accent); font-size:11px;">✓ Đã nộp</span>' : ''}</span></div>
       <div class="cat-amount sub-effective-amount" data-id="${s.id}" style="cursor:pointer; text-decoration:underline dotted;">${fmtMoney(amt)}</div>
     </div>`;
   }).join('') + `<div class="cat-row" style="border-top:1px solid var(--border); margin-top:4px; padding-top:10px;"><strong>Tổng dự kiến</strong><strong>${fmtMoney(total)}</strong></div>
@@ -664,8 +669,23 @@ function openLabelModal(tx) {
   });
   subSel.value = tx.subscription_id || '';
 
+  const subMonthInput = $('#label-subscription-month');
+  const subMonthLabel = $('#label-sub-month-label');
+  const showMonth = !!subSel.value;
+  subMonthLabel.style.display = showMonth ? 'block' : 'none';
+  subMonthInput.style.display = showMonth ? 'block' : 'none';
+  subMonthInput.value = tx.subscription_month || monthKeyFromDate(parseTxDate(tx.thoi_gian_giao_dich));
+
   openModal(modal);
 }
+$('#label-subscription-select').addEventListener('change', (e) => {
+  const show = !!e.target.value;
+  $('#label-sub-month-label').style.display = show ? 'block' : 'none';
+  $('#label-subscription-month').style.display = show ? 'block' : 'none';
+  if (show && !$('#label-subscription-month').value) {
+    $('#label-subscription-month').value = monthKeyFromDate(new Date());
+  }
+});
 
 async function saveLabel() {
   const modal = $('#label-modal');
@@ -673,13 +693,14 @@ async function saveLabel() {
   const cat = modal.dataset.selectedCat;
   const note = $('#label-note').value;
   const subscriptionId = $('#label-subscription-select').value || null;
+  const subscriptionMonth = subscriptionId ? ($('#label-subscription-month').value || null) : null;
   if (!cat) { alert('Chọn 1 danh mục'); return; }
   $('#save-label-btn').disabled = true;
   try {
     const newData = await ghUpdateJson('data/transactions.json', (data) => {
       const list = data || [];
       const idx = list.findIndex(t => t.id === txId);
-      if (idx >= 0) { list[idx].category = cat; list[idx].note = note; list[idx].labeled = true; list[idx].subscription_id = subscriptionId; }
+      if (idx >= 0) { list[idx].category = cat; list[idx].note = note; list[idx].labeled = true; list[idx].subscription_id = subscriptionId; list[idx].subscription_month = subscriptionMonth; }
       return list;
     }, `label: ${txId}`);
     STATE.transactions = newData;
