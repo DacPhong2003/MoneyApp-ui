@@ -112,6 +112,10 @@ $$('.next-month-btn').forEach(b => b.addEventListener('click', () => {
 }));
 
 // ---------- RENDER ----------
+function safeRender(name, fn) {
+  try { fn(); } catch (e) { console.error(`Loi render ${name}:`, e); }
+}
+
 function renderAll() {
   const monthKey = monthKeyFromDate(STATE.currentMonthDate);
   updateMonthLabels();
@@ -126,12 +130,12 @@ function renderAll() {
     banner.style.display = 'none';
   }
 
-  renderSummary(monthKey);
-  renderSubsSummary(monthKey);
-  renderCategoryChart(monthKey);
-  renderTrendChart();
-  renderTxList(monthKey);
-  renderNotifications();
+  safeRender('summary', () => renderSummary(monthKey));
+  safeRender('subs-summary', () => renderSubsSummary(monthKey));
+  safeRender('category-chart', () => renderCategoryChart(monthKey));
+  safeRender('trend-chart', () => renderTrendChart());
+  safeRender('tx-list', () => renderTxList(monthKey));
+  safeRender('notifications', () => renderNotifications());
 }
 
 function renderSummary(monthKey) {
@@ -236,16 +240,21 @@ function renderCategoryChart(monthKey) {
   const entries = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
 
   const canvas = $('#category-chart');
-  if (STATE.categoryChart) STATE.categoryChart.destroy();
-  if (entries.length === 0) {
+  const chartAvailable = typeof Chart !== 'undefined';
+  if (!chartAvailable) {
     canvas.style.display = 'none';
   } else {
-    canvas.style.display = 'block';
-    STATE.categoryChart = new Chart(canvas, {
-      type: 'doughnut',
-      data: { labels: entries.map(e => e[0]), datasets: [{ data: entries.map(e => e[1]), backgroundColor: entries.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]), borderWidth: 0 }] },
-      options: { plugins: { legend: { display: false } }, cutout: '65%' }
-    });
+    if (STATE.categoryChart) STATE.categoryChart.destroy();
+    if (entries.length === 0) {
+      canvas.style.display = 'none';
+    } else {
+      canvas.style.display = 'block';
+      STATE.categoryChart = new Chart(canvas, {
+        type: 'doughnut',
+        data: { labels: entries.map(e => e[0]), datasets: [{ data: entries.map(e => e[1]), backgroundColor: entries.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]), borderWidth: 0 }] },
+        options: { plugins: { legend: { display: false } }, cutout: '65%' }
+      });
+    }
   }
 
   const list = $('#category-breakdown');
@@ -271,6 +280,7 @@ function renderTrendChart() {
   }
   const totals = months.map(m => STATE.transactions.filter(t => txInMonth(t, m.key)).reduce((s, t) => s + Number(t.so_tien || 0), 0));
   const canvas = $('#trend-chart');
+  if (typeof Chart === 'undefined') return;
   if (STATE.trendChart) STATE.trendChart.destroy();
   STATE.trendChart = new Chart(canvas, {
     type: 'bar',
