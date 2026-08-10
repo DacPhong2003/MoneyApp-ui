@@ -301,6 +301,14 @@
       <div class="tx-summary-label">Đã tiêu</div>
       <div class="tx-summary-value" id="stat-da-tieu-pct">0%</div>
     </div>
+    <div class="tx-summary-card">
+      <div class="tx-summary-label">Chi phí (cố định + không cố định)</div>
+      <div class="tx-summary-value" id="stat-chiphi-total">0đ</div>
+    </div>
+    <div class="tx-summary-card thu">
+      <div class="tx-summary-label">Đã đóng</div>
+      <div class="tx-summary-value" id="stat-chiphi-paid">0đ</div>
+    </div>
   </div>
 
   <section style="margin-top:0;">
@@ -314,7 +322,7 @@
   </section>
 
   <section id="cat-wallets-section" style="display:none;">
-    <h2>Ví cố định</h2>
+    <h2>Phí không cố định</h2>
     <div class="chart-card" id="cat-wallets-card"></div>
   </section>
 </div>
@@ -364,7 +372,7 @@
     </div>
 
     <div class="settings-card">
-      <h3>Ví cố định</h3>
+      <h3>Phí không cố định</h3>
       <div id="wallets-list" style="margin-bottom:12px;"></div>
       <div class="field-label">Tên</div>
       <input id="wallet-name-input" placeholder="VD: Fundiin, Kredivo...">
@@ -372,7 +380,7 @@
       <input id="wallet-amount-input" type="number" placeholder="VD: 500000">
       <div class="field-label">Tháng / năm</div>
       <input id="wallet-month-input" type="month">
-      <button id="add-wallet-btn" class="btn-primary">Thêm ví cố định</button>
+      <button id="add-wallet-btn" class="btn-primary">Thêm phí không cố định</button>
     </div>
   </section>
 </div>
@@ -404,7 +412,7 @@
     <select id="label-subscription-select"><option value="">Không</option></select>
     <div class="field-label" id="label-sub-month-label" style="display:none;">Cho tháng nào</div>
     <input type="month" id="label-subscription-month" style="display:none;">
-    <div class="field-label">Ví cố định</div>
+    <div class="field-label">Phí không cố định</div>
     <select id="label-wallet-select"><option value="">Không</option></select>
     <div class="field-label" id="label-wallet-month-label" style="display:none;">Cho tháng nào</div>
     <input type="month" id="label-wallet-month" style="display:none;">
@@ -443,7 +451,7 @@
 
 <div class="modal" id="wallet-edit-modal">
   <div class="modal-box">
-    <h3>Sửa ví cố định</h3>
+    <h3>Sửa phí không cố định</h3>
     <div class="field-label">Tên</div>
     <input id="wallet-edit-name-input" placeholder="VD: Fundiin, Kredivo...">
     <div class="field-label">Số tiền</div>

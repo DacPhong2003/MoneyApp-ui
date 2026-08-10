@@ -470,6 +470,9 @@ function renderCategoryListPage() {
     $('#stat-con-lai').style.color = conLai < 0 ? 'var(--danger)' : 'var(--accent)';
     $('#stat-da-tieu-pct').textContent = daTieuPct + '%';
     $('#stat-da-tieu-pct').style.color = daTieuPct > 100 ? 'var(--danger)' : (daTieuPct >= 80 ? 'var(--warn)' : 'var(--accent)');
+
+    $('#stat-chiphi-total').textContent = fmtMoney(subsAllTotal + walletsAllTotal);
+    $('#stat-chiphi-paid').textContent = fmtMoney(subsPaidTotal + walletsPaidTotal);
   } else {
     statGrid.style.display = 'none';
   }
@@ -1142,7 +1145,7 @@ function renderWalletsList() {
   const wrap = $('#wallets-list');
   wrap.innerHTML = '';
   if (!STATE.wallets || STATE.wallets.length === 0) {
-    wrap.innerHTML = '<div class="empty-state" style="padding:8px 0;">Chưa có ví cố định nào.</div>';
+    wrap.innerHTML = '<div class="empty-state" style="padding:8px 0;">Chưa có phí không cố định nào.</div>';
     return;
   }
   [...STATE.wallets].sort((a, b) => (b.month || '').localeCompare(a.month || '')).forEach(w => {
@@ -1215,7 +1218,7 @@ $('#wallet-edit-save-btn').addEventListener('click', saveWalletEdit);
 $('#wallet-edit-close-btn').addEventListener('click', () => { closeModal($('#wallet-edit-modal')); });
 
 async function removeWallet(id) {
-  if (!confirm('Xoá ví cố định này?')) return;
+  if (!confirm('Xoá phí không cố định này?')) return;
   try {
     const newData = await ghUpdateJson('data/wallets.json', (data) => (data || []).filter(w => w.id !== id), `remove wallet: ${id}`);
     STATE.wallets = newData;
