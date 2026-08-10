@@ -134,7 +134,7 @@ function fmtDateTime(iso) {
 
 let STATE = {
   transactions: [], categories: [], budgets: { overall_monthly: null, by_category: {} },
-  subscriptions: [], wallets: [], txCustomStart: null, txCustomEnd: null,
+  subscriptions: [], wallets: [], accountBalance: { baseline: 0 }, txCustomStart: null, txCustomEnd: null,
   ovViewMode: 'month', ovPeriodDate: new Date(), ovCustomStart: null, ovCustomEnd: null,
   catViewMode: 'month', catPeriodDate: new Date(), catCustomStart: null, catCustomEnd: null,
   filterCategory: '', sort: 'date_desc',
@@ -166,18 +166,20 @@ function txInWeek(t, refDate) {
 }
 
 async function loadAll() {
-  const [tx, cats, budgets, subs, wallets] = await Promise.all([
+  const [tx, cats, budgets, subs, wallets, accountBalance] = await Promise.all([
     ghGetFile('data/transactions.json'),
     ghGetFile('data/categories.json'),
     ghGetFile('data/budgets.json').catch(() => ({ data: { overall_monthly: null, by_category: {} }, sha: null })),
     ghGetFile('data/subscriptions.json').catch(() => ({ data: [], sha: null })),
-    ghGetFile('data/wallets.json').catch(() => ({ data: [], sha: null }))
+    ghGetFile('data/wallets.json').catch(() => ({ data: [], sha: null })),
+    ghGetFile('data/account_balance.json').catch(() => ({ data: { baseline: 0 }, sha: null }))
   ]);
   STATE.transactions = tx.data;
   STATE.categories = cats.data;
   STATE.budgets = budgets.data;
   STATE.subscriptions = subs.data;
   STATE.wallets = wallets.data;
+  STATE.accountBalance = accountBalance.data;
 
   const filterSel = $('#filter-category');
   filterSel.innerHTML = '<option value="">Tất cả danh mục</option>';
@@ -276,10 +278,22 @@ function renderOverview() {
   $('#subs-summary-section').style.display = isMonth && STATE.subscriptions.length > 0 ? 'block' : 'none';
   $('#ov-budget-card').style.display = isMonth ? 'block' : 'none';
   const tx = getOverviewTx();
+  safeRender('account-balance', () => renderAccountBalance());
   safeRender('summary', () => renderSummary(tx));
   if (isMonth) safeRender('subs-summary', () => renderSubsSummary(monthKeyFromDate(STATE.ovPeriodDate)));
   safeRender('category-chart', () => renderCategoryChart(tx));
   safeRender('trend-chart', () => renderTrendChart());
+}
+
+// "Tien trong tai khoan" khong phu thuoc bo loc thang/tuan/khoang ngay -
+// luon tinh tren TOAN BO giao dich tu truoc den nay.
+function renderAccountBalance() {
+  const baseline = Number((STATE.accountBalance && STATE.accountBalance.baseline) || 0);
+  const thuAll = STATE.transactions.filter(isThu).reduce((s, t) => s + Number(t.so_tien || 0), 0);
+  const chiAll = STATE.transactions.filter(isChi).reduce((s, t) => s + Number(t.so_tien || 0), 0);
+  const balance = baseline + thuAll - chiAll;
+  $('#ov-account-balance').textContent = fmtMoney(balance);
+  $('#ov-account-balance').style.color = balance < 0 ? 'var(--danger)' : 'var(--text)';
 }
 
 // ---------- GIAO DICH: dieu huong theo thang HOAC theo tuan ----------
@@ -1251,10 +1265,23 @@ async function boot() {
     renderCategoryTags();
     renderSubsList();
     renderWalletsList();
+    $('#account-balance-input').value = (STATE.accountBalance && STATE.accountBalance.baseline) || '';
   } catch (e) {
     alert('Lỗi tải dữ liệu: ' + e.message + '\nKiểm tra lại token trong Cài đặt.');
   }
 }
+async function saveAccountBalance() {
+  const baseline = parseFloat($('#account-balance-input').value) || 0;
+  $('#save-balance-btn').disabled = true;
+  try {
+    const newData = await ghUpdateJson('data/account_balance.json', () => ({ baseline }), 'update account balance');
+    STATE.accountBalance = newData;
+    safeRender('account-balance', () => renderAccountBalance());
+    alert('Đã lưu số dư');
+  } catch (e) { alert('Lưu thất bại: ' + e.message); }
+  finally { $('#save-balance-btn').disabled = false; }
+}
+$('#save-balance-btn').addEventListener('click', saveAccountBalance);
 
 $('#save-label-btn').addEventListener('click', saveLabel);
 $('#delete-tx-btn').addEventListener('click', deleteTx);

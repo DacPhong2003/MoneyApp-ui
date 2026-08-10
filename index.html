@@ -163,6 +163,10 @@
 
 <!-- TRANG TONG QUAN -->
 <div class="page active" id="page-overview">
+  <div class="tx-summary-card" style="margin: 16px 16px 14px; padding: 16px;">
+    <div class="tx-summary-label">Tiền trong tài khoản</div>
+    <div class="tx-summary-value" id="ov-account-balance" style="font-size:24px;">0đ</div>
+  </div>
   <div class="view-toggle">
     <button class="view-toggle-btn active" data-mode="month">Theo tháng</button>
     <button class="view-toggle-btn" data-mode="week">Theo tuần</button>
@@ -334,6 +338,14 @@
       <h3>GitHub Token</h3>
       <input id="settings-token-input" type="password" placeholder="github_pat_...">
       <button id="settings-save-token-btn" class="btn-primary">Lưu token</button>
+    </div>
+
+    <div class="settings-card">
+      <h3>Số dư tài khoản</h3>
+      <div class="field-label">Số tiền hiện tại trong tài khoản</div>
+      <input id="account-balance-input" type="number" placeholder="VD: 10000000">
+      <button id="save-balance-btn" class="btn-primary">Lưu số dư</button>
+      <div style="font-size:11px; color:var(--muted); margin-top:8px;">Số này là mốc gốc — app sẽ cộng tổng thu, trừ tổng chi phát sinh từ giờ để ra "Tiền trong tài khoản" ở tab Tổng quan.</div>
     </div>
 
     <div class="settings-card">
