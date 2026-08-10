@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chi Tiêu Cá Nhân</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f172a">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f172a; color: #e2e8f0; padding-bottom: 40px;
+  }
+  header {
+    padding: 20px 16px 12px; display: flex; justify-content: space-between; align-items: center;
+  }
+  header h1 { font-size: 20px; margin: 0; }
+  header button {
+    background: #1e293b; color: #e2e8f0; border: none; border-radius: 8px;
+    padding: 8px 12px; font-size: 14px;
+  }
+  #unlabeled-banner {
+    display: none; margin: 0 16px 12px; background: #7f1d1d; color: #fecaca;
+    padding: 10px 14px; border-radius: 10px; font-size: 14px; font-weight: 600;
+  }
+  .summary-card {
+    margin: 0 16px 16px; background: #1e293b; border-radius: 14px; padding: 16px;
+  }
+  .summary-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px; }
+  .summary-row .chi { color: #f87171; font-weight: 700; }
+  .summary-row .thu { color: #4ade80; font-weight: 700; }
+  section { margin: 0 16px 20px; }
+  section h2 { font-size: 15px; color: #94a3b8; margin: 0 0 10px; }
+  .cat-row {
+    display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px;
+    border-bottom: 1px solid #1e293b;
+  }
+  .tx-item {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #1e293b; padding: 12px 14px; border-radius: 10px; margin-bottom: 8px;
+  }
+  .tx-unlabeled { border: 1px solid #f87171; }
+  .tx-partner { font-size: 14px; font-weight: 600; }
+  .tx-note { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .tx-side { text-align: right; }
+  .tx-amount { font-size: 14px; font-weight: 700; }
+  .amount-in { color: #4ade80; }
+  .amount-out { color: #f87171; }
+  .tx-cat { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .modal {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    align-items: flex-end; justify-content: center; z-index: 50;
+  }
+  .modal-box {
+    background: #1e293b; width: 100%; max-width: 480px; border-radius: 16px 16px 0 0;
+    padding: 20px; max-height: 80vh; overflow-y: auto;
+  }
+  .modal-box h3 { margin-top: 0; }
+  .chip-wrap { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  .chip {
+    background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 20px;
+    padding: 8px 14px; font-size: 13px;
+  }
+  .chip-selected { background: #22c55e; color: #0f172a; border-color: #22c55e; font-weight: 700; }
+  .modal-box input, .modal-box textarea {
+    width: 100%; background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 8px; padding: 10px; font-size: 14px; margin-bottom: 12px;
+  }
+  .btn-primary {
+    width: 100%; background: #22c55e; color: #0f172a; border: none; border-radius: 10px;
+    padding: 12px; font-size: 15px; font-weight: 700;
+  }
+  .btn-secondary {
+    width: 100%; background: transparent; color: #94a3b8; border: none; padding: 10px;
+    font-size: 14px; margin-top: 6px;
+  }
+  #push-status { font-size: 12px; color: #94a3b8; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Chi Tiêu Cá Nhân</h1>
+  <div style="display:flex; gap:8px;">
+    <button id="refresh-btn">↻</button>
+    <button id="settings-btn">⚙</button>
+  </div>
+</header>
+
+<div id="unlabeled-banner"></div>
+
+<div class="summary-card">
+  <div style="font-size:12px; color:#94a3b8; margin-bottom:8px;">Tháng <span id="summary-month"></span></div>
+  <div class="summary-row"><span>Đã chi</span><span class="chi" id="summary-chi">0đ</span></div>
+  <div class="summary-row"><span>Đã nhận</span><span class="thu" id="summary-thu">0đ</span></div>
+  <button id="enable-push-btn" class="btn-primary" style="margin-top:10px;">Bật thông báo đẩy</button>
+  <div id="push-status"></div>
+</div>
+
+<section>
+  <h2>Theo danh mục (tháng này)</h2>
+  <div id="category-breakdown"></div>
+</section>
+
+<section>
+  <h2>Lịch sử giao dịch</h2>
+  <div id="tx-list"></div>
+</section>
+
+<div class="modal" id="token-modal">
+  <div class="modal-box">
+    <h3>Kết nối dữ liệu</h3>
+    <p style="font-size:13px; color:#94a3b8;">Dán GitHub token (quyền Contents) — chỉ lưu trên máy này, không gửi đi đâu khác.</p>
+    <input id="token-input" type="password" placeholder="github_pat_...">
+    <button id="save-token-btn" class="btn-primary">Lưu</button>
+  </div>
+</div>
+
+<div class="modal" id="label-modal">
+  <div class="modal-box">
+    <h3>Gắn nhãn giao dịch</h3>
+    <div style="font-size:13px; color:#94a3b8; margin-bottom:4px;" id="label-partner"></div>
+    <div style="font-size:20px; font-weight:700; margin-bottom:12px;" id="label-amount"></div>
+    <div class="chip-wrap" id="category-chips"></div>
+    <textarea id="label-note" placeholder="Ghi chú: mục đích, từ đâu..." rows="2"></textarea>
+    <button id="save-label-btn" class="btn-primary">Lưu</button>
+    <button id="close-label-btn" class="btn-secondary">Đóng</button>
+  </div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>
